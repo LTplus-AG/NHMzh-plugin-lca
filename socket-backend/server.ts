@@ -123,7 +123,6 @@ interface MongoIdObject {
 interface QtoElement {
   _id: string | ObjectId;
   project_id: string | ObjectId | { $oid: string };
-  ifc_id?: string;
   global_id?: string;
   guid?: string;
   ifc_class?: string;
@@ -570,16 +569,16 @@ wss.on("connection", (ws) => {
                       );
                     } else {
                       // Optional: Log materials with zero/invalid volume if needed
-                      // console.log(`Skipping material '${name}' in element ${element._id} due to zero/invalid volume: ${material.volume}`);
+                      // console.log(`Skipping material '${name}' in element ${element.global_id || 'unknown'} due to zero/invalid volume: ${material.volume}`);
                     }
                   } else {
                     // Optional: Log if a material entry is invalid
-                    // console.warn(`Invalid material entry in element ${element._id}:`, material);
+                    // console.warn(`Invalid material entry in element ${element.global_id || 'unknown'}:`, material);
                   }
                 });
               } else {
                 // Optional: Log elements with no materials array or empty array
-                // console.log(`Element ${element._id} has no materials or an empty materials array.`);
+                // console.log(`Element ${element.global_id || 'unknown'} has no materials or an empty materials array.`);
               }
             });
 
@@ -884,9 +883,7 @@ wss.on("connection", (ws) => {
         const lcaElementsForKafka: LcaElementData[] = elements.map(
           (element: any, index: number) => ({
             id:
-              element.qto_element_id ||
-              element._id?.toString() ||
-              element.id ||
+              element.global_id ||
               `unknown_${index}`,
             category: element.ifc_class || element.category || "unknown",
             level: element.level || "",

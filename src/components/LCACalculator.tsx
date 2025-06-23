@@ -253,10 +253,7 @@ export default function LCACalculatorComponent(): JSX.Element {
       // Initialize impact as undefined, it will be calculated later
       return {
         id:
-          element.id ||
           element.global_id ||
-          element.ifc_id ||
-          element._id?.toString() ||
           `elem-${index}`,
         element_type:
           element.element_type || element.ifc_class || "Unknown Element",

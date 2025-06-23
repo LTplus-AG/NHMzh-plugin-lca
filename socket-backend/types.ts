@@ -47,7 +47,7 @@ export interface QtoElement {
   _id: any; // Using 'any' for flexibility with ObjectId/string
   project_id: any;
   global_id?: string;
-  ifc_id?: string;
+
   properties?: { [key: string]: any };
   materials?: {
     name: string;
