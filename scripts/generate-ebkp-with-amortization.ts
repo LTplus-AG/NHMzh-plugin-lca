@@ -1,4 +1,5 @@
 import fs from 'fs';
+import path from 'path';
 import { EBKP_STRUCTURE } from '../src/data/ebkp-types';
 
 const raw_data: [string, number[]][] = [
@@ -111,7 +112,7 @@ for (const elementgruppen of Object.values(structuredWithAmortization)) {
 console.log(`Applied amortization to ${elementsWithAmortization} out of ${totalElements} elements`);
 
 // Write JSON with amortization
-fs.writeFileSync('./ebkp-with-amortization.json', JSON.stringify(structuredWithAmortization, null, 2));
+fs.writeFileSync(path.resolve(__dirname, 'ebkp-with-amortization.json'), JSON.stringify(structuredWithAmortization, null, 2));
 console.log('Written: ebkp-with-amortization.json');
 
 // Generate TypeScript types and constants
@@ -154,7 +155,7 @@ ${allElementsWithAmortization.map(element =>
 ]);
 `;
 
-fs.writeFileSync('./ebkp-with-amortization-types.ts', tsOutput.trim());
+fs.writeFileSync(path.resolve(__dirname, 'ebkp-with-amortization-types.ts'), tsOutput.trim());
 console.log('Written: ebkp-with-amortization-types.ts');
 
 // Create a summary report

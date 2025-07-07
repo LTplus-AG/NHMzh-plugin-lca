@@ -1,4 +1,5 @@
 import { AMORTIZATION_LOOKUP } from '../data/ebkp-with-amortization-types';
+import { DEFAULT_AMORTIZATION_YEARS } from './constants';
 
 /**
  * Gets the amortization years for a given EBKP code.
@@ -7,7 +8,7 @@ import { AMORTIZATION_LOOKUP } from '../data/ebkp-with-amortization-types';
  * @param defaultYears - Default value if no amortization data is found
  * @returns The amortization years for the EBKP code
  */
-export function getAmortizationYears(ebkpCode: string, defaultYears: number = 50): number {
+export function getAmortizationYears(ebkpCode: string, defaultYears: number = DEFAULT_AMORTIZATION_YEARS): number {
   const amortizationOptions = AMORTIZATION_LOOKUP.get(ebkpCode);
   
   if (amortizationOptions && amortizationOptions.length > 0) {
@@ -49,7 +50,7 @@ export function getEbkpCodesWithAmortization(): string[] {
  * @param defaultYears - Default amortization years for codes with multiple options
  * @returns Record mapping EBKP codes to single amortization values
  */
-export function createLegacyAmortizationMap(defaultYears: number = 50): Record<string, number> {
+export function createLegacyAmortizationMap(defaultYears: number = DEFAULT_AMORTIZATION_YEARS): Record<string, number> {
   const legacyMap: Record<string, number> = {};
   
   for (const [ebkpCode, amortizationOptions] of AMORTIZATION_LOOKUP.entries()) {

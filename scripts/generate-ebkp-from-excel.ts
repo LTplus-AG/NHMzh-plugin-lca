@@ -9,10 +9,18 @@ interface Entry {
   bezeichnung: string;
 }
 
-// Get the Excel file path from command line argument or use default
-const excelPath = process.argv[2] || 'C:\\Users\\louistrue\\Dropbox\\02_Ressourcen\\02_BIM\\11_CRB\\CRB_ifc_Regelsatz_eBKP-H2020_BETA_1.0.xlsx';
+// Get the Excel file path from command line argument or use default relative path
+const excelPath = process.argv[2] || path.join(__dirname, '..', 'data', 'CRB_ifc_Regelsatz_eBKP-H2020_BETA_1.0.xlsx');
 
 console.log('Reading Excel file from:', excelPath);
+
+// Check if the Excel file exists
+if (!fs.existsSync(excelPath)) {
+  console.error(`ERROR: Excel file not found at: ${excelPath}`);
+  console.error('Please provide a valid Excel file path as a command line argument:');
+  console.error('  node generate-ebkp-from-excel.js <path-to-excel-file>');
+  process.exit(1);
+}
 
 // Read the Excel file
 const workbook = XLSX.readFile(excelPath);
@@ -91,7 +99,7 @@ for (const entry of entries) {
 }
 
 // Write JSON with labels
-fs.writeFileSync('./ebkp-structured.json', JSON.stringify(structured, null, 2));
+fs.writeFileSync(path.resolve(__dirname, 'ebkp-structured.json'), JSON.stringify(structured, null, 2));
 console.log('Written: ebkp-structured.json');
 
 // Types
@@ -115,7 +123,7 @@ export type EBKPElement =
 export const EBKP_STRUCTURE = ${JSON.stringify(structured, null, 2)} as const;
 `;
 
-fs.writeFileSync('./ebkp-types.ts', tsOutput.trim());
+fs.writeFileSync(path.resolve(__dirname, 'ebkp-types.ts'), tsOutput.trim());
 console.log('Written: ebkp-types.ts');
 
 console.log('\nSummary:');
