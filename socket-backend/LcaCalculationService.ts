@@ -53,9 +53,7 @@ export class LcaCalculationService {
       const elementEbkcCode = qtoElement.properties?.ebkp_code || null;
       const elementGlobalId =
         qtoElement.global_id ||
-        qtoElement.ifc_id ||
-        qtoElement._id?.toString() || // Handle ObjectId
-        `unknown_element_${Math.random().toString(16).slice(2)}`; // Fallback
+        `unknown_element_${Math.random().toString(16).slice(2)}`; // Fallback if global_id is empty
 
       let sequence = 0;
 
@@ -74,7 +72,7 @@ export class LcaCalculationService {
           const normalizedQtoMatName = normalizeMaterialName(material.name);
           let mappedKbobId: string | null = null;
 
-          // Find KBOB mapping (adapt based on how materialMappings keys are structured)
+          // Find KBOB mapping
           // This assumes keys in materialMappings might match normalized names
           // Adjust if keys are element-specific IDs from the frontend.
           mappedKbobId =
