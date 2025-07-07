@@ -25,7 +25,7 @@ import {
   LcaElement,
 } from "../../types/lca.types";
 import { DisplayMode } from "../../utils/lcaDisplayHelper";
-import { BUILDING_LIFETIME_YEARS } from "../../utils/constants";
+import { DEFAULT_AMORTIZATION_YEARS } from "../../utils/constants";
 
 interface ElementImpactTableProps {
   elements: LcaElement[];
@@ -38,7 +38,7 @@ interface ElementImpactTableProps {
 // --- Helper Functions ---
 const formatNumber = (
   num: number | null | undefined,
-  decimals: number = 0
+  decimals: number = 3
 ): string => {
   if (num === null || num === undefined || isNaN(num)) return "N/A";
   return new Intl.NumberFormat("de-CH", {
@@ -87,8 +87,8 @@ const formatDisplayValue = (
     amortizationYears
   );
   if (displayValue === undefined) return "N/A";
-  const decimals = getDecimalPrecision(displayValue, displayMode);
-  return formatNumber(displayValue, decimals);
+  // Always use 3 decimal places
+  return formatNumber(displayValue, 3);
 };
 
 const getUnitForOutputFormat = (
@@ -137,7 +137,8 @@ type SortableKeys =
   | "ebkp"
   | "impact"
   | "groupKey"
-  | "elementCount";
+  | "elementCount"
+  | "amortization";
 interface SortConfig {
   key: SortableKeys;
   direction: "asc" | "desc";
@@ -247,15 +248,19 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
                 a.impact?.[impactKey],
                 displayMode,
                 ebfNumeric,
-                a.amortization_years ?? BUILDING_LIFETIME_YEARS
+                a.amortization_years ?? DEFAULT_AMORTIZATION_YEARS
               ) ?? -Infinity;
             bValue =
               getDisplayValue(
                 b.impact?.[impactKey],
                 displayMode,
                 ebfNumeric,
-                b.amortization_years ?? BUILDING_LIFETIME_YEARS
+                b.amortization_years ?? DEFAULT_AMORTIZATION_YEARS
               ) ?? -Infinity;
+            break;
+          case "amortization":
+            aValue = a.amortization_years ?? DEFAULT_AMORTIZATION_YEARS;
+            bValue = b.amortization_years ?? DEFAULT_AMORTIZATION_YEARS;
             break;
           default:
             return 0;
@@ -344,20 +349,25 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
                   a.totalImpact?.[impactKeyGroup],
                   displayMode,
                   ebfNumeric,
-                  BUILDING_LIFETIME_YEARS
+                  DEFAULT_AMORTIZATION_YEARS
                 ) ?? -Infinity;
               bValue =
                 getDisplayValue(
                   b.totalImpact?.[impactKeyGroup],
                   displayMode,
                   ebfNumeric,
-                  BUILDING_LIFETIME_YEARS
+                  DEFAULT_AMORTIZATION_YEARS
                 ) ?? -Infinity;
               break;
             case "ebkp":
               aValue = a.groupKey || "";
               bValue = b.groupKey || "";
               break;
+                          case "amortization":
+                // For grouped rows, amortization doesn't make sense as different elements might have different years
+                aValue = 0;
+                bValue = 0;
+                break;
             default:
               return 0;
           }
@@ -645,6 +655,20 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
                   </TableSortLabel>
                 )}
               </TableCell>
+              {displayMode === "relative" && (
+                <TableCell align="right" sx={{ fontWeight: "medium" }}>
+                  <TableSortLabel
+                    active={sortConfig?.key === "amortization"}
+                    direction={
+                      sortConfig?.key === "amortization" ? sortConfig.direction : "asc"
+                    }
+                    onClick={() => handleSortRequest("amortization")}
+                    disabled={isGrouped}
+                  >
+                    Amortisationsdauer (Jahre)
+                  </TableSortLabel>
+                </TableCell>
+              )}
               <TableCell align="right" sx={{ fontWeight: "medium" }}>
                 <TableSortLabel
                   active={sortConfig?.key === "impact"}
@@ -661,7 +685,7 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
           <TableBody>
             {processedData.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} align="center">
+                <TableCell colSpan={displayMode === "relative" ? 7 : 6} align="center">
                   <Typography
                     variant="body2"
                     color="text.secondary"
@@ -714,10 +738,10 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
                       </Tooltip>
                     </TableCell>
                     <TableCell align="right">
-                      {formatNumber(group.elementCount)}
+                      {formatNumber(group.elementCount, 0)}
                     </TableCell>
                     <TableCell align="right">
-                      {formatNumber(group.totalQuantity, 2)}
+                      {formatNumber(group.totalQuantity, 3)}
                     </TableCell>
                     <TableCell align="right">
                       <Tooltip
@@ -727,12 +751,22 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
                         <span>N/A</span>
                       </Tooltip>
                     </TableCell>
+                    {displayMode === "relative" && (
+                      <TableCell align="right">
+                        <Tooltip
+                          title="Amortisationsdauer nicht relevant für Gruppenansicht"
+                          enterDelay={500}
+                        >
+                          <span>N/A</span>
+                        </Tooltip>
+                      </TableCell>
+                    )}
                     <TableCell align="right">
                       {formatDisplayValue(
                         groupImpactValue,
                         displayMode,
                         ebfNumeric,
-                        BUILDING_LIFETIME_YEARS
+                        DEFAULT_AMORTIZATION_YEARS
                       )}
                     </TableCell>
                   </TableRow>
@@ -816,12 +850,17 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
                         <span>{ebkpCode}</span>
                       </Tooltip>
                     </TableCell>
+                    {displayMode === "relative" && (
+                      <TableCell align="right">
+                        {formatNumber(element.amortization_years ?? DEFAULT_AMORTIZATION_YEARS, 0)}
+                      </TableCell>
+                    )}
                     <TableCell align="right">
                       {formatDisplayValue(
                         impactValue,
                         displayMode,
                         ebfNumeric,
-                        element.amortization_years ?? BUILDING_LIFETIME_YEARS
+                        element.amortization_years ?? DEFAULT_AMORTIZATION_YEARS
                       )}
                     </TableCell>
                   </TableRow>

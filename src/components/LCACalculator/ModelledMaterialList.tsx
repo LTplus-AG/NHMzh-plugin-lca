@@ -414,8 +414,8 @@ const ModelledMaterialList: React.FC<ModelledMaterialListProps> = ({
                     sx={{ fontWeight: 600, lineHeight: 1 }}
                   >
                     {typeof material.volume === "number"
-                      ? material.volume.toFixed(2)
-                      : "0.00"}{" "}
+                      ? material.volume.toFixed(3)
+                      : "0.000"}{" "}
                     m³
                   </Typography>
                 </Box>
@@ -449,7 +449,8 @@ const ModelledMaterialList: React.FC<ModelledMaterialListProps> = ({
                   <Box sx={{ mt: "auto", pt: 1 }}>
                     <Chip
                       label={`${emissionValue.toLocaleString("de-CH", {
-                        maximumFractionDigits: 2,
+                        minimumFractionDigits: 3,
+                        maximumFractionDigits: 3,
                       })} ${getEmissionUnit()}`}
                       size="small"
                       sx={{

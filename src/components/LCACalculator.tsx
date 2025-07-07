@@ -55,8 +55,8 @@ import {
 } from "../services/websocketService";
 
 import { LCAImpactCalculator } from "../utils/lcaImpactCalculator";
-import { amortizationYearsByEbkp } from "../utils/amortizationData";
-import { BUILDING_LIFETIME_YEARS } from "../utils/constants";
+import { getAmortizationYears } from "../utils/amortizationUtils";
+import { DEFAULT_AMORTIZATION_YEARS } from "../utils/constants";
 
 const calculator = new LCACalculator();
 
@@ -285,9 +285,10 @@ export default function LCACalculatorComponent(): JSX.Element {
 
     return elements.map((element) => {
       let elementImpact: MaterialImpact = { gwp: 0, ubp: 0, penr: 0 };
-      const amortYears =
-        amortizationYearsByEbkp[element.properties.ebkp_code ?? ""] ||
-        BUILDING_LIFETIME_YEARS;
+      const amortYears = getAmortizationYears(
+        element.properties.ebkp_code ?? "",
+        DEFAULT_AMORTIZATION_YEARS
+      );
 
       element.materials.forEach((material) => {
         const kbobId = currentMatches[material.id];

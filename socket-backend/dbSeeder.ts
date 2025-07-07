@@ -54,7 +54,7 @@ export async function seedKbobData(lcaDb: Db): Promise<void> {
       // Corrected path relative to dbSeeder.ts within socket-backend
       const jsonFilePath = path.join(
         __dirname,
-        "../data/indicatorsKBOB_v6.json"
+        "./data/indicatorsKBOB_v6.json"
       );
       console.log(`Attempting to read KBOB data from: ${jsonFilePath}`);
 

@@ -27,7 +27,7 @@ import {
   LcaElement,
   MaterialImpact,
 } from "../../types/lca.types";
-import { BUILDING_LIFETIME_YEARS } from "../../utils/constants";
+import { DEFAULT_AMORTIZATION_YEARS } from "../../utils/constants";
 import { LCACalculator } from "../../utils/lcaCalculator";
 import { DisplayMode } from "../../utils/lcaDisplayHelper";
 import ElementImpactTable from "./ElementImpactTable";
@@ -450,18 +450,18 @@ const ReviewDialog: React.FC<ReviewDialogProps> = ({
                         )}
                       </TableCell>
                       <TableCell align="right">
-                        {formatNumber(material.volume, 2)}
+                                                        {formatNumber(material.volume, 3)}
                       </TableCell>
                       <TableCell align="right">
-                        {formatDisplayValue(impact?.gwp, BUILDING_LIFETIME_YEARS)}
+                        {formatDisplayValue(impact?.gwp, DEFAULT_AMORTIZATION_YEARS)}
                       </TableCell>
                       <TableCell align="right">
-                        {formatDisplayValue(impact?.ubp, BUILDING_LIFETIME_YEARS)}
+                        {formatDisplayValue(impact?.ubp, DEFAULT_AMORTIZATION_YEARS)}
                       </TableCell>
                       <TableCell align="right">
                         {formatDisplayValue(
                           impact?.penr,
-                          BUILDING_LIFETIME_YEARS
+                          DEFAULT_AMORTIZATION_YEARS
                         )}
                       </TableCell>
                     </TableRow>

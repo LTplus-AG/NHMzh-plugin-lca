@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Tooltip, styled } from "@mui/material";
+import PublicIcon from "@mui/icons-material/Public"; // Icon for total mode
 import SquareFootIcon from "@mui/icons-material/SquareFoot"; // Icon for relative mode
-import AllInclusiveIcon from "@mui/icons-material/AllInclusive"; // Icon for total mode
 import { DisplayMode } from "../../utils/lcaDisplayHelper"; // Import shared DisplayMode type
 
 interface DisplayModeToggleProps {
@@ -71,7 +71,7 @@ const DisplayModeToggle: React.FC<DisplayModeToggleProps> = ({
           onClick={() => onChange("total")}
           sx={{ mr: 0.5 }} // Add margin between buttons
         >
-          <AllInclusiveIcon fontSize="small" />
+          <PublicIcon fontSize="small" />
         </ToggleButton>
       </Tooltip>
 
