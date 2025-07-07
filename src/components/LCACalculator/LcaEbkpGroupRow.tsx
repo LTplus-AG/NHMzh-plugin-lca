@@ -1,5 +1,5 @@
 import React from 'react';
-import { TableRow, TableCell, IconButton, Typography, Box, Collapse, Tooltip } from '@mui/material';
+import { TableRow, TableCell, IconButton, Typography, Box, Tooltip } from '@mui/material';
 import { ChevronRight } from '@mui/icons-material';
 import { LcaEbkpGroup, LcaElement, OutputFormats } from '../../types/lca.types';
 import { DisplayMode } from '../../utils/lcaDisplayHelper';
