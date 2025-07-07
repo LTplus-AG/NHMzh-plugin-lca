@@ -8,6 +8,7 @@ import {
 import { DisplayMode, LCADisplayHelper } from "./lcaDisplayHelper";
 import { LCAFormatter } from "./lcaFormatter";
 import { LCAImpactCalculator } from "./lcaImpactCalculator";
+import { DEFAULT_AMORTIZATION_YEARS } from "./constants";
 
 export class LCACalculator {
   /**
@@ -36,7 +37,8 @@ export class LCACalculator {
 
     const { divisor, error } = LCADisplayHelper.getDivisorAndSuffix(
       displayMode,
-      ebf
+      ebf,
+      DEFAULT_AMORTIZATION_YEARS
     );
 
     // If relative mode requested but EBF invalid, return null impacts
@@ -128,7 +130,8 @@ export class LCACalculator {
   ): string {
     const { divisor, suffix, error } = LCADisplayHelper.getDivisorAndSuffix(
       displayMode,
-      ebf
+      ebf,
+      lifetime || DEFAULT_AMORTIZATION_YEARS
     );
 
     // Handle error state for relative mode with invalid EBF

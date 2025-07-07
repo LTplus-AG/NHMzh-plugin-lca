@@ -173,4 +173,5 @@ export interface LcaElement {
     kbob_id?: string; // Optional KBOB mapping ID at material instance level
   }[];
   impact?: MaterialImpact; // Use existing MaterialImpact type
+  amortization_years?: number; // Dynamic lifetime based on EBKP
 }
