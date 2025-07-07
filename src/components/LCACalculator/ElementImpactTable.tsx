@@ -18,7 +18,9 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  IconButton,
 } from "@mui/material";
+import { ChevronRight } from "@mui/icons-material";
 import {
   OutputFormats,
   MaterialImpact,
@@ -26,6 +28,9 @@ import {
 } from "../../types/lca.types";
 import { DisplayMode } from "../../utils/lcaDisplayHelper";
 import { DEFAULT_AMORTIZATION_YEARS } from "../../utils/constants";
+import { useLcaEbkpGroups } from "../../utils/useLcaEbkpGroups";
+import { MainLcaEbkpGroupRow } from "./MainLcaEbkpGroupRow";
+import { LcaEbkpGroupRow } from "./LcaEbkpGroupRow";
 
 interface ElementImpactTableProps {
   elements: LcaElement[];
@@ -104,7 +109,7 @@ const getUnitForOutputFormat = (
       baseUnit = "UBP";
       break;
     case OutputFormats.PENR:
-      baseUnit = "MJ";
+      baseUnit = "kWh";
       break;
     default:
       baseUnit = "";
@@ -145,7 +150,7 @@ interface SortConfig {
 }
 
 // Type for Grouping
-type GroupingMode = "none" | "ifcClass" | "typeName";
+type GroupingMode = "none" | "ifcClass" | "typeName" | "ebkp";
 
 // Interface for Grouped Rows
 interface GroupedRow {
@@ -173,11 +178,74 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(100);
-  const [groupBy, setGroupBy] = useState<GroupingMode>("none");
+  const [groupBy, setGroupBy] = useState<GroupingMode>("ebkp");
+  
+  // Hierarchical table state for EBKP grouping
+  const [expandedMainGroups, setExpandedMainGroups] = useState<string[]>([]);
+  const [expandedEbkp, setExpandedEbkp] = useState<string[]>([]);
 
   const impactUnit = getUnitForOutputFormat(outputFormat, displayMode);
   const impactLabel = getOutputFormatLabel(outputFormat);
   const impactKey = outputFormat.toLowerCase() as keyof MaterialImpact;
+
+  // Use hierarchical groups hook for EBKP grouping
+  const { ebkpGroups, hierarchicalGroups } = useLcaEbkpGroups(elements);
+
+  // Expand/collapse functionality
+  const toggleMainGroup = (mainGroup: string) => {
+    setExpandedMainGroups(prev => 
+      prev.includes(mainGroup) 
+        ? prev.filter(g => g !== mainGroup)
+        : [...prev, mainGroup]
+    );
+  };
+
+  const toggleEbkpGroup = (code: string) => {
+    setExpandedEbkp(prev => 
+      prev.includes(code) 
+        ? prev.filter(c => c !== code)
+        : [...prev, code]
+    );
+  };
+
+  // Determine if all groups are expanded
+  const areAllGroupsExpanded = useMemo(() => {
+    if (hierarchicalGroups && hierarchicalGroups.length > 0) {
+      // Check if all main groups are expanded
+      const allMainGroupsExpanded = hierarchicalGroups.every(group => 
+        expandedMainGroups.includes(group.mainGroup)
+      );
+      
+      // Check if all sub-groups are expanded
+      const allSubGroupsCodes = hierarchicalGroups.flatMap(group => 
+        group.subGroups.map(subGroup => subGroup.code)
+      );
+      const allSubGroupsExpanded = allSubGroupsCodes.every(code => 
+        expandedEbkp.includes(code)
+      );
+      
+      return allMainGroupsExpanded && allSubGroupsExpanded;
+    }
+    return false;
+  }, [hierarchicalGroups, expandedMainGroups, expandedEbkp]);
+
+  const toggleExpandAll = () => {
+    if (areAllGroupsExpanded) {
+      // Collapse all
+      setExpandedMainGroups([]);
+      setExpandedEbkp([]);
+    } else {
+      // Expand all
+      if (hierarchicalGroups) {
+        const allMainGroups = hierarchicalGroups.map(group => group.mainGroup);
+        const allSubGroupsCodes = hierarchicalGroups.flatMap(group => 
+          group.subGroups.map(subGroup => subGroup.code)
+        );
+        setExpandedMainGroups(allMainGroups);
+        setExpandedEbkp(allSubGroupsCodes);
+      }
+    }
+  };
 
   // Memoized filtering, grouping, and sorting
   const processedData = useMemo(() => {
@@ -288,9 +356,11 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
       filteredElements.forEach((element) => {
         let key: string;
         if (groupBy === "ifcClass") {
-          key = element.element_type;
+          key = element.element_type || "Unknown IFC Class";
+        } else if (groupBy === "typeName") {
+          key = element.type_name || "Unknown Type Name";
         } else {
-          key = element.type_name || element.element_type;
+          key = element.type_name || element.element_type || "Unknown";
         }
 
         if (!groups.has(key)) {
@@ -421,6 +491,7 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
     let effectiveKey = key;
     if (groupBy !== "none") {
       if (key === "ifc_class") effectiveKey = "groupKey";
+      if (key === "typeName") effectiveKey = "groupKey";
       if (key === "materials") effectiveKey = "elementCount";
       if (key === "ebkp") effectiveKey = "groupKey";
     }
@@ -566,97 +637,131 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
             <MenuItem value="none">Keine Gruppierung</MenuItem>
             <MenuItem value="ifcClass">IFC Klasse</MenuItem>
             <MenuItem value="typeName">Typ Name</MenuItem>
+            <MenuItem value="ebkp">EBKP Code</MenuItem>
           </Select>
         </FormControl>
       </Box>
       <TableContainer component={Paper} variant="outlined">
         <Table size="small" stickyHeader>
           <TableHead>
-            <TableRow>
-              <TableCell sx={{ fontWeight: "medium" }}>
-                <TableSortLabel
-                  active={
-                    sortConfig?.key === (isGrouped ? "groupKey" : "ifc_class")
-                  }
-                  direction={
-                    sortConfig?.key === (isGrouped ? "groupKey" : "ifc_class")
-                      ? sortConfig.direction
-                      : "asc"
-                  }
-                  onClick={() =>
-                    handleSortRequest(isGrouped ? "groupKey" : "ifc_class")
-                  }
-                >
-                  IFC Klasse
-                </TableSortLabel>
-              </TableCell>
-              <TableCell sx={{ fontWeight: "medium" }}>
-                <TableSortLabel
-                  active={
-                    sortConfig?.key === (isGrouped ? "groupKey" : "typeName")
-                  }
-                  direction={
-                    sortConfig?.key === (isGrouped ? "groupKey" : "typeName")
-                      ? sortConfig.direction
-                      : "asc"
-                  }
-                  onClick={() =>
-                    handleSortRequest(isGrouped ? "groupKey" : "typeName")
-                  }
-                  disabled={isGrouped && groupBy === "ifcClass"}
-                >
-                  Typ Name
-                </TableSortLabel>
-              </TableCell>
-              <TableCell sx={{ fontWeight: "medium" }}>
-                <TableSortLabel
-                  active={
-                    sortConfig?.key ===
-                    (isGrouped ? "elementCount" : "materials")
-                  }
-                  direction={
-                    sortConfig?.key ===
-                    (isGrouped ? "elementCount" : "materials")
-                      ? sortConfig.direction
-                      : "asc"
-                  }
-                  onClick={() =>
-                    handleSortRequest(isGrouped ? "elementCount" : "materials")
-                  }
-                >
-                  {isGrouped ? "Anzahl Elemente" : "Materialien"}
-                </TableSortLabel>
-              </TableCell>
-              <TableCell align="right" sx={{ fontWeight: "medium" }}>
-                <TableSortLabel
-                  active={sortConfig?.key === "quantity"}
-                  direction={
-                    sortConfig?.key === "quantity"
-                      ? sortConfig.direction
-                      : "asc"
-                  }
-                  onClick={() => handleSortRequest("quantity")}
-                >
-                  Volumen (m³)
-                </TableSortLabel>
-              </TableCell>
-              <TableCell align="right" sx={{ fontWeight: "medium" }}>
-                {isGrouped ? (
-                  "EBKP"
+            <TableRow sx={{ backgroundColor: "rgba(0, 0, 0, 0.04)" }}>
+              <TableCell sx={{ py: 2, fontWeight: "bold" }}>
+                {groupBy === "ebkp" ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <IconButton
+                      size="small"
+                      onClick={toggleExpandAll}
+                      sx={{
+                        mr: 1,
+                        p: 0.5,
+                        transition: 'transform 0.2s ease',
+                        transform: areAllGroupsExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                        color: hierarchicalGroups && hierarchicalGroups.length > 0 ? 'primary.main' : 'text.disabled',
+                      }}
+                    >
+                      <ChevronRight />
+                    </IconButton>
+                    EBKP Gruppe / Bezeichnung
+                  </Box>
                 ) : (
                   <TableSortLabel
-                    active={sortConfig?.key === "ebkp"}
-                    direction={
-                      sortConfig?.key === "ebkp" ? sortConfig.direction : "asc"
+                    active={
+                      sortConfig?.key === (isGrouped ? "groupKey" : "ifc_class")
                     }
-                    onClick={() => handleSortRequest("ebkp")}
+                    direction={
+                      sortConfig?.key === (isGrouped ? "groupKey" : "ifc_class")
+                        ? sortConfig.direction
+                        : "asc"
+                    }
+                    onClick={() =>
+                      handleSortRequest(isGrouped ? "groupKey" : "ifc_class")
+                    }
                   >
-                    EBKP
+                    IFC Klasse
                   </TableSortLabel>
                 )}
               </TableCell>
-              {displayMode === "relative" && (
-                <TableCell align="right" sx={{ fontWeight: "medium" }}>
+              <TableCell sx={{ py: 2, fontWeight: "bold" }}>
+                {groupBy === "ebkp" ? (
+                  "Anzahl Elemente"
+                ) : (
+                  <TableSortLabel
+                    active={
+                      sortConfig?.key === (isGrouped ? "groupKey" : "typeName")
+                    }
+                    direction={
+                      sortConfig?.key === (isGrouped ? "groupKey" : "typeName")
+                        ? sortConfig.direction
+                        : "asc"
+                    }
+                    onClick={() =>
+                      handleSortRequest(isGrouped ? "groupKey" : "typeName")
+                    }
+                    disabled={isGrouped && groupBy === "ifcClass"}
+                  >
+                    Typ Name
+                  </TableSortLabel>
+                )}
+              </TableCell>
+              <TableCell align="right" sx={{ py: 2, fontWeight: "bold" }}>
+                {groupBy === "ebkp" ? (
+                  "Volumen (m³)"
+                ) : (
+                  <TableSortLabel
+                    active={
+                      sortConfig?.key ===
+                      (isGrouped ? "elementCount" : "materials")
+                    }
+                    direction={
+                      sortConfig?.key ===
+                      (isGrouped ? "elementCount" : "materials")
+                        ? sortConfig.direction
+                        : "asc"
+                    }
+                    onClick={() =>
+                      handleSortRequest(isGrouped ? "elementCount" : "materials")
+                    }
+                  >
+                    {isGrouped ? "Anzahl Elemente" : "Materialien"}
+                  </TableSortLabel>
+                )}
+              </TableCell>
+              <TableCell align="right" sx={{ py: 2, fontWeight: "bold" }}>
+                {groupBy === "ebkp" ? (
+                  `${impactLabel} (${impactUnit})`
+                ) : (
+                  <TableSortLabel
+                    active={sortConfig?.key === "quantity"}
+                    direction={
+                      sortConfig?.key === "quantity"
+                        ? sortConfig.direction
+                        : "asc"
+                    }
+                    onClick={() => handleSortRequest("quantity")}
+                  >
+                    Volumen (m³)
+                  </TableSortLabel>
+                )}
+              </TableCell>
+              {groupBy !== "ebkp" && (
+                <TableCell align="right" sx={{ py: 2, fontWeight: "bold" }}>
+                  {isGrouped ? (
+                    "EBKP"
+                  ) : (
+                    <TableSortLabel
+                      active={sortConfig?.key === "ebkp"}
+                      direction={
+                        sortConfig?.key === "ebkp" ? sortConfig.direction : "asc"
+                      }
+                      onClick={() => handleSortRequest("ebkp")}
+                    >
+                      EBKP
+                    </TableSortLabel>
+                  )}
+                </TableCell>
+              )}
+              {displayMode === "relative" && groupBy !== "ebkp" && (
+                <TableCell align="right" sx={{ py: 2, fontWeight: "bold" }}>
                   <TableSortLabel
                     active={sortConfig?.key === "amortization"}
                     direction={
@@ -669,21 +774,52 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
                   </TableSortLabel>
                 </TableCell>
               )}
-              <TableCell align="right" sx={{ fontWeight: "medium" }}>
-                <TableSortLabel
-                  active={sortConfig?.key === "impact"}
-                  direction={
-                    sortConfig?.key === "impact" ? sortConfig.direction : "asc"
-                  }
-                  onClick={() => handleSortRequest("impact")}
-                >
-                  {impactLabel} ({impactUnit})
-                </TableSortLabel>
-              </TableCell>
+              {groupBy !== "ebkp" && (
+                <TableCell align="right" sx={{ py: 2, fontWeight: "bold" }}>
+                  <TableSortLabel
+                    active={sortConfig?.key === "impact"}
+                    direction={
+                      sortConfig?.key === "impact" ? sortConfig.direction : "asc"
+                    }
+                    onClick={() => handleSortRequest("impact")}
+                  >
+                    {impactLabel} ({impactUnit})
+                  </TableSortLabel>
+                </TableCell>
+              )}
             </TableRow>
           </TableHead>
           <TableBody>
-            {processedData.length === 0 && (
+            {/* Hierarchical EBKP Table */}
+            {groupBy === "ebkp" && hierarchicalGroups && hierarchicalGroups.length > 0 && 
+              hierarchicalGroups.map((hierarchicalGroup) => (
+                <React.Fragment key={hierarchicalGroup.mainGroup}>
+                  <MainLcaEbkpGroupRow
+                    group={hierarchicalGroup}
+                    isExpanded={expandedMainGroups.includes(hierarchicalGroup.mainGroup)}
+                    onToggle={() => toggleMainGroup(hierarchicalGroup.mainGroup)}
+                    outputFormat={outputFormat}
+                    displayMode={displayMode}
+                    ebfNumeric={ebfNumeric}
+                  />
+                  {expandedMainGroups.includes(hierarchicalGroup.mainGroup) &&
+                    hierarchicalGroup.subGroups.map((subGroup) => (
+                      <LcaEbkpGroupRow
+                        key={subGroup.code}
+                        group={subGroup}
+                        isExpanded={expandedEbkp.includes(subGroup.code)}
+                        onToggle={() => toggleEbkpGroup(subGroup.code)}
+                        outputFormat={outputFormat}
+                        displayMode={displayMode}
+                        ebfNumeric={ebfNumeric}
+                      />
+                    ))}
+                </React.Fragment>
+              ))
+            }
+            
+            {/* Regular table content */}
+            {groupBy !== "ebkp" && processedData.length === 0 && (
               <TableRow>
                 <TableCell colSpan={displayMode === "relative" ? 7 : 6} align="center">
                   <Typography
@@ -698,7 +834,22 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
                 </TableCell>
               </TableRow>
             )}
-            {displayData.map((item, index) => {
+            
+            {/* Empty state for EBKP grouping */}
+            {groupBy === "ebkp" && (!hierarchicalGroups || hierarchicalGroups.length === 0) && (
+              <TableRow>
+                <TableCell colSpan={4} align="center">
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ p: 2 }}
+                  >
+                    Keine EBKP-Gruppen vorhanden.
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            )}
+            {groupBy !== "ebkp" && displayData.map((item, index) => {
               if (isGrouped) {
                 const group = item as GroupedRow;
                 const groupImpactValue = group.totalImpact[impactKey];
@@ -785,12 +936,7 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
                 const ifcClassDisplay = element.element_type || "N/A";
                 const typeNameDisplay = element.type_name || "N/A";
 
-                console.log(
-                  `Rendering Element ID: ${element.id}, Type Name:`,
-                  element.type_name,
-                  "Full Element:",
-                  element
-                );
+
 
                 return (
                   <TableRow
@@ -870,27 +1016,29 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
           </TableBody>
         </Table>
       </TableContainer>
-      <TablePagination
-        component="div"
-        count={processedData.length}
-        page={page}
-        onPageChange={handleChangePage}
-        rowsPerPage={rowsPerPage}
-        onRowsPerPageChange={handleChangeRowsPerPage}
-        rowsPerPageOptions={[10, 25, 50, 100, { label: "Alle", value: -1 }]}
-        labelRowsPerPage="Zeilen pro Seite:"
-        labelDisplayedRows={({ from, to, count }) =>
-          `${from}–${to} von ${count !== -1 ? count : `mehr als ${to}`}`
-        }
-        sx={{
-          border: 1,
-          borderColor: "divider",
-          borderTop: 0,
-          borderBottomLeftRadius: (theme) => theme.shape.borderRadius,
-          borderBottomRightRadius: (theme) => theme.shape.borderRadius,
-          bgcolor: "background.paper",
-        }}
-      />
+      {groupBy !== "ebkp" && (
+        <TablePagination
+          component="div"
+          count={processedData.length}
+          page={page}
+          onPageChange={handleChangePage}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          rowsPerPageOptions={[10, 25, 50, 100, { label: "Alle", value: -1 }]}
+          labelRowsPerPage="Zeilen pro Seite:"
+          labelDisplayedRows={({ from, to, count }) =>
+            `${from}–${to} von ${count !== -1 ? count : `mehr als ${to}`}`
+          }
+          sx={{
+            border: 1,
+            borderColor: "divider",
+            borderTop: 0,
+            borderBottomLeftRadius: (theme) => theme.shape.borderRadius,
+            borderBottomRightRadius: (theme) => theme.shape.borderRadius,
+            bgcolor: "background.paper",
+          }}
+        />
+      )}
     </Box>
   );
 };

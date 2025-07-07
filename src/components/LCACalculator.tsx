@@ -1079,9 +1079,7 @@ export default function LCACalculatorComponent(): JSX.Element {
       elementsToProcess.length > 0 &&
       kbobMaterials.length > 0
     ) {
-      console.log(
-        "[Debug LCA Calc] Recalculating element impacts due to dependency change"
-      );
+
       // Ensure elements still conform (might be redundant if ifcResult always holds conformed)
       const conformingElementsInput = ensureElementsConform(elementsToProcess);
 

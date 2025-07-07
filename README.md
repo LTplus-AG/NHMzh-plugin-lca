@@ -104,7 +104,7 @@ The LCA plugin uses MongoDB to store environmental impact data. The primary data
 {
   gwp: number,     // Global Warming Potential (kg CO2-eq)
   ubp: number,     // Environmental Impact Points (UBP points)
-  penr: number     // Primary Energy Non-Renewable (MJ)
+  penr: number     // Primary Energy Non-Renewable (kWh)
 }
 ```
 

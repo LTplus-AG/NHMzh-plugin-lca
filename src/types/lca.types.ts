@@ -175,3 +175,22 @@ export interface LcaElement {
   impact?: MaterialImpact; // Use existing MaterialImpact type
   amortization_years?: number; // Dynamic lifetime based on EBKP
 }
+
+// Hierarchical EBKP types for LCA
+export interface LcaEbkpGroup {
+  code: string;
+  name: string;
+  elements: LcaElement[];
+  totalQuantity: number;
+  totalImpact: MaterialImpact;
+  elementCount: number;
+}
+
+export interface HierarchicalLcaEbkpGroup {
+  mainGroup: string;
+  mainGroupName: string;
+  subGroups: LcaEbkpGroup[];
+  totalElements: number;
+  totalQuantity: number;
+  totalImpact: MaterialImpact;
+}
