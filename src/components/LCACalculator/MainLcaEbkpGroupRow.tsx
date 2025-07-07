@@ -93,7 +93,7 @@ export const MainLcaEbkpGroupRow: React.FC<MainLcaEbkpGroupRowProps> = ({
           </Typography>
         </TableCell>
         <TableCell align="right" sx={{ py: 2, width: '20%' }}>
-          <Typography variant="body2" fontWeight="medium" sx={{ 
+          <Typography variant="body2" sx={{ 
             fontWeight: hasZeroQuantity ? 'bold' : 'medium',
             color: hasZeroQuantity ? 'warning.main' : 'inherit'
           }}>
