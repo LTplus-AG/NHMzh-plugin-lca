@@ -109,7 +109,7 @@ const getUnitForOutputFormat = (
       baseUnit = "UBP";
       break;
     case OutputFormats.PENR:
-      baseUnit = "MJ";
+      baseUnit = "kWh";
       break;
     default:
       baseUnit = "";
@@ -791,34 +791,32 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
           </TableHead>
           <TableBody>
             {/* Hierarchical EBKP Table */}
-            {groupBy === "ebkp" && hierarchicalGroups && hierarchicalGroups.length > 0 && (
-              <>
-                {hierarchicalGroups.map((hierarchicalGroup) => (
-                  <React.Fragment key={hierarchicalGroup.mainGroup}>
-                    <MainLcaEbkpGroupRow
-                      group={hierarchicalGroup}
-                      isExpanded={expandedMainGroups.includes(hierarchicalGroup.mainGroup)}
-                      onToggle={() => toggleMainGroup(hierarchicalGroup.mainGroup)}
-                      outputFormat={outputFormat}
-                      displayMode={displayMode}
-                      ebfNumeric={ebfNumeric}
-                    />
-                    {expandedMainGroups.includes(hierarchicalGroup.mainGroup) &&
-                      hierarchicalGroup.subGroups.map((subGroup) => (
-                        <LcaEbkpGroupRow
-                          key={subGroup.code}
-                          group={subGroup}
-                          isExpanded={expandedEbkp.includes(subGroup.code)}
-                          onToggle={() => toggleEbkpGroup(subGroup.code)}
-                          outputFormat={outputFormat}
-                          displayMode={displayMode}
-                          ebfNumeric={ebfNumeric}
-                        />
-                      ))}
-                  </React.Fragment>
-                ))}
-              </>
-            )}
+            {groupBy === "ebkp" && hierarchicalGroups && hierarchicalGroups.length > 0 && 
+              hierarchicalGroups.map((hierarchicalGroup) => (
+                <React.Fragment key={hierarchicalGroup.mainGroup}>
+                  <MainLcaEbkpGroupRow
+                    group={hierarchicalGroup}
+                    isExpanded={expandedMainGroups.includes(hierarchicalGroup.mainGroup)}
+                    onToggle={() => toggleMainGroup(hierarchicalGroup.mainGroup)}
+                    outputFormat={outputFormat}
+                    displayMode={displayMode}
+                    ebfNumeric={ebfNumeric}
+                  />
+                  {expandedMainGroups.includes(hierarchicalGroup.mainGroup) &&
+                    hierarchicalGroup.subGroups.map((subGroup) => (
+                      <LcaEbkpGroupRow
+                        key={subGroup.code}
+                        group={subGroup}
+                        isExpanded={expandedEbkp.includes(subGroup.code)}
+                        onToggle={() => toggleEbkpGroup(subGroup.code)}
+                        outputFormat={outputFormat}
+                        displayMode={displayMode}
+                        ebfNumeric={ebfNumeric}
+                      />
+                    ))}
+                </React.Fragment>
+              ))
+            }
             
             {/* Regular table content */}
             {groupBy !== "ebkp" && processedData.length === 0 && (

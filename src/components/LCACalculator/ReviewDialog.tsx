@@ -127,7 +127,7 @@ const ReviewDialog: React.FC<ReviewDialogProps> = ({
         baseUnit = "UBP";
         break;
       case OutputFormats.PENR:
-        baseUnit = "MJ"; // Or kWh?
+        baseUnit = "kWh"; // Or kWh?
         break;
       default:
         baseUnit = "";

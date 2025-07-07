@@ -3,7 +3,7 @@ import { TableRow, TableCell, IconButton, Typography, Box, Collapse, Tooltip } f
 import { ChevronRight } from '@mui/icons-material';
 import { LcaEbkpGroup, LcaElement, OutputFormats } from '../../types/lca.types';
 import { DisplayMode } from '../../utils/lcaDisplayHelper';
-import { DEFAULT_AMORTIZATION_YEARS } from '../../utils/constants';
+import { formatNumber, formatDisplayValue, getUnitForOutputFormat } from '../../utils/lcaFormatUtils';
 import { isZeroQuantity, getZeroQuantityStyles, getZeroQuantityTooltip } from '../../utils/zeroQuantityHighlight';
 import CopyableText from '../ui/CopyableText';
 
@@ -16,64 +16,7 @@ interface LcaEbkpGroupRowProps {
   ebfNumeric: number | null;
 }
 
-const formatNumber = (
-  num: number | null | undefined,
-  decimals: number = 3
-): string => {
-  if (num === null || num === undefined || isNaN(num)) return "0";
-  return new Intl.NumberFormat("de-CH", {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-    useGrouping: true,
-  }).format(num);
-};
 
-const getDisplayValue = (
-  value: number | undefined,
-  displayMode: DisplayMode,
-  ebfNumeric: number | null,
-  amortizationYears: number = DEFAULT_AMORTIZATION_YEARS
-): number => {
-  if (value === undefined) return 0;
-  if (displayMode === "relative" && ebfNumeric !== null && ebfNumeric > 0) {
-    return value / (amortizationYears * ebfNumeric);
-  }
-  return value;
-};
-
-const formatDisplayValue = (
-  value: number | undefined,
-  displayMode: DisplayMode,
-  ebfNumeric: number | null,
-  amortizationYears: number = DEFAULT_AMORTIZATION_YEARS
-): string => {
-  const displayValue = getDisplayValue(value, displayMode, ebfNumeric, amortizationYears);
-  return formatNumber(displayValue, 3);
-};
-
-const getUnitForOutputFormat = (
-  outputFormat: OutputFormats,
-  displayMode: DisplayMode
-): string => {
-  let baseUnit = "";
-  switch (outputFormat) {
-    case OutputFormats.GWP:
-      baseUnit = "kg CO₂-eq";
-      break;
-    case OutputFormats.UBP:
-      baseUnit = "UBP";
-      break;
-    case OutputFormats.PENR:
-      baseUnit = "MJ";
-      break;
-    default:
-      baseUnit = "";
-  }
-  if (displayMode === "relative") {
-    return `${baseUnit}/m²·a`;
-  }
-  return baseUnit;
-};
 
 const ElementRow: React.FC<{
   element: LcaElement;
