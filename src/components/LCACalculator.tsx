@@ -340,19 +340,28 @@ export default function LCACalculatorComponent(): JSX.Element {
 
     const loadProjectMaterials = async () => {
       if (!selectedProject) {
+        console.log("[loadProjectMaterials] No project selected");
         setInitialLoading(false);
         setMetadataLoading(false);
         return;
       }
+
+      console.log("[loadProjectMaterials] Loading materials for project:", selectedProject);
 
       try {
         const projectData: ProjectData = await getProjectMaterials(
           selectedProject.value
         );
 
+        console.log("[loadProjectMaterials] Received project data:", projectData);
+
         if (projectData && projectData.ifcData) {
           const rawElements = projectData.ifcData.elements || [];
+          console.log("[loadProjectMaterials] Raw elements count:", rawElements.length);
+          console.log("[loadProjectMaterials] First 3 raw elements:", rawElements.slice(0, 3));
+
           const conformingElementsInput = ensureElementsConform(rawElements);
+          console.log("[loadProjectMaterials] Conforming elements count:", conformingElementsInput.length);
 
           setProjectMetadata({
             filename: projectData.metadata?.filename || "Unbekannte Datei",
@@ -389,6 +398,9 @@ export default function LCACalculatorComponent(): JSX.Element {
             unit: "m³",
           }));
 
+          console.log("[loadProjectMaterials] Materials array:", materialsArray);
+          console.log("[loadProjectMaterials] Materials count:", materialsArray.length);
+
           setModelledMaterials(materialsArray);
 
           if (kbobMaterials.length > 0) {
@@ -400,12 +412,15 @@ export default function LCACalculatorComponent(): JSX.Element {
             );
             setIfcElementsWithImpacts(elementsWithCalculatedImpacts);
           } else {
+            console.log("[loadProjectMaterials] KBOB materials not loaded yet");
             setIfcElementsWithImpacts(conformingElementsInput);
           }
 
           if (projectData.materialMappings) {
+            console.log("[loadProjectMaterials] Material mappings:", projectData.materialMappings);
             setMatches(projectData.materialMappings);
           } else {
+            console.log("[loadProjectMaterials] No material mappings found");
             setMatches({});
           }
 
@@ -415,7 +430,7 @@ export default function LCACalculatorComponent(): JSX.Element {
             setEbfInput("");
           }
         } else {
-          console.warn(`No project data found for ${selectedProject.value}`);
+          console.warn(`[loadProjectMaterials] No project data found for ${selectedProject.value}`);
           setModelledMaterials([]);
           setMatches({});
           setEbfInput("");
@@ -432,7 +447,7 @@ export default function LCACalculatorComponent(): JSX.Element {
         }
       } catch (error) {
         console.error(
-          `Error loading project data for ${selectedProject.value}:`,
+          `[loadProjectMaterials] Error loading project data for ${selectedProject.value}:`,
           error
         );
         setModelledMaterials([]);
@@ -998,7 +1013,6 @@ export default function LCACalculatorComponent(): JSX.Element {
 
     try {
       await saveProjectMaterials(selectedProject.value, {
-        ifcData: ifcResult.ifcData,
         materialMappings: matches,
         ebfValue: ebfInput,
       });
@@ -1155,11 +1169,14 @@ export default function LCACalculatorComponent(): JSX.Element {
 
   const fetchProjects = async () => {
     try {
+      console.log("[fetchProjects] Starting to fetch projects...");
       setProjectsLoading(true);
       setInitialLoading(true);
       await initWebSocket();
       await new Promise((resolve) => setTimeout(resolve, 300));
       const projectData = await getProjects();
+      console.log("[fetchProjects] Received projects:", projectData);
+      
       const options = projectData.map((project) => ({
         value: project.id,
         label: project.name,
@@ -1167,21 +1184,24 @@ export default function LCACalculatorComponent(): JSX.Element {
 
       const finalOptions =
         options.length === 0 ? DEFAULT_PROJECT_OPTIONS : options;
+      
+      console.log("[fetchProjects] Final project options:", finalOptions);
       setProjectOptions(finalOptions);
 
       if (!selectedProject && finalOptions.length > 0) {
-        console.log("Auto-selecting first project:", finalOptions[0].label);
+        console.log("[fetchProjects] Auto-selecting first project:", finalOptions[0].label);
         setSelectedProject(finalOptions[0]);
       } else {
+        console.log("[fetchProjects] Selected project already exists or no options available");
         setInitialLoading(false);
       }
     } catch (error) {
-      console.error("Error fetching projects:", error);
+      console.error("[fetchProjects] Error fetching projects:", error);
       setProjectOptions(DEFAULT_PROJECT_OPTIONS);
 
       if (!selectedProject && DEFAULT_PROJECT_OPTIONS.length > 0) {
         console.log(
-          "Auto-selecting first default project:",
+          "[fetchProjects] Auto-selecting first default project:",
           DEFAULT_PROJECT_OPTIONS[0].label
         );
         setSelectedProject(DEFAULT_PROJECT_OPTIONS[0]);
@@ -1194,6 +1214,7 @@ export default function LCACalculatorComponent(): JSX.Element {
   };
 
   useEffect(() => {
+    console.log("[useEffect] Initial projects fetch on mount");
     fetchProjects();
   }, []);
 
@@ -1207,7 +1228,6 @@ export default function LCACalculatorComponent(): JSX.Element {
     }
 
     const formattedData = {
-      ifcData: ifcResult.ifcData,
       materialMappings: matches,
       ebfValue: ebfInput,
     };

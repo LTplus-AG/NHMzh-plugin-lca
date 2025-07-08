@@ -13,22 +13,19 @@ if (MONGODB_URI && !MONGODB_URI.includes("authSource=")) {
 export const config = {
   websocket: { port: parseInt(process.env.WEBSOCKET_PORT || "8002") },
   mongodb: {
-    enabled: true,
     uri:
-      MONGODB_URI ||
-      "mongodb://admin:secure_password@mongodb:27017/?authSource=admin", // Fallback URI
+      process.env.MONGODB_URI ||
+      `mongodb://${process.env.MONGODB_USERNAME || "admin"}:${process.env.MONGODB_PASSWORD || "admin"}@mongodb:27017/?authSource=admin`, // Fallback URI
     database: process.env.MONGODB_DATABASE || "lca",
-    collections: {
-      lcaResults: "lcaResults",
-      materialLibrary: "materialLibrary",
-      references: "references",
-      materialEmissions: "materialEmissions",
-      elementEmissions: "elementEmissions",
-    },
     qtoDatabase: process.env.MONGODB_QTO_DATABASE || "qto",
+    collections: {
+      lcaElements: process.env.MONGODB_LCA_ELEMENTS_COLLECTION || "lcaElements",
+      lcaResults: process.env.MONGODB_LCA_RESULTS_COLLECTION || "lcaResults",
+      materialLibrary: process.env.MONGODB_MATERIAL_LIBRARY_COLLECTION || "materialLibrary",
+    },
     auth: {
-      username: process.env.MONGODB_USERNAME || "admin",
-      password: process.env.MONGODB_PASSWORD || "secure_password",
+      username: process.env.MONGODB_USERNAME || process.env.MONGODB_USERNAME || "admin",
+      password: process.env.MONGODB_PASSWORD || process.env.MONGODB_PASSWORD || "admin",
     },
   },
   kafka: {
