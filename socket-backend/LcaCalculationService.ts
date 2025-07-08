@@ -25,13 +25,15 @@ export class LcaCalculationService {
    * @param materialMappings - Record mapping original material names/ids to KBOB IDs.
    * @param kbobMaterials - Array of KBOB material data.
    * @param ebf - Energiebezugsfläche (Energy Reference Area) for relative calculations.
+   * @param materialDensities - Custom density values for materials (optional).
    * @returns An object containing the list of processed material instances and total impacts.
    */
   static calculateLcaResults(
     qtoElements: QtoElement[],
     materialMappings: Record<string, string>,
     kbobMaterials: KbobMaterial[],
-    ebf: number | null
+    ebf: number | null,
+    materialDensities?: Record<string, number>
   ): LcaCalculationResult {
     const results: MaterialInstanceResult[] = [];
     let totalGwp = 0;
@@ -77,7 +79,26 @@ export class LcaCalculationService {
 
           const kbobMat = mappedKbobId ? kbobMap.get(mappedKbobId) : null;
           const volume = parseFloat(material.volume?.toString() || "0");
-          const density = kbobMat?.density || 0;
+          
+          // Calculate density: use custom density if available, otherwise use default
+          let density = 0;
+          
+          // Check for custom density first
+          if (materialDensities && material.name && materialDensities[material.name] !== undefined) {
+            density = materialDensities[material.name];
+            console.log(`[LCA Calc] Using custom density ${density} for material ${material.name}`);
+          } else if (materialDensities && normalizedQtoMatName && materialDensities[normalizedQtoMatName] !== undefined) {
+            density = materialDensities[normalizedQtoMatName];
+            console.log(`[LCA Calc] Using custom density ${density} for normalized material ${normalizedQtoMatName}`);
+          } else if (kbobMat) {
+            // Fall back to KBOB default density
+            if (kbobMat.densityRange && kbobMat.densityRange.min && kbobMat.densityRange.max) {
+              // Use middle value of density range as default
+              density = (kbobMat.densityRange.min + kbobMat.densityRange.max) / 2;
+            } else {
+              density = kbobMat.density || 0;
+            }
+          }
 
           let gwpAbs = 0,
             ubpAbs = 0,

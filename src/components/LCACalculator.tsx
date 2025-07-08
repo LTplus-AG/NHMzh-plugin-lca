@@ -22,7 +22,7 @@ import {
   Typography,
   useTheme,
 } from "@mui/material";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import Select from "react-select";
 import { fetchKBOBMaterials } from "../services/kbobService";
 import {
@@ -51,6 +51,7 @@ import {
   initWebSocket,
   onStatusChange,
   saveProjectMaterials,
+  saveMaterialDensities,
   ProjectData,
 } from "../services/websocketService";
 
@@ -181,6 +182,9 @@ export default function LCACalculatorComponent(): JSX.Element {
   const [projectMetadata, setProjectMetadata] =
     useState<ProjectMetadata | null>(null);
   const [metadataLoading, setMetadataLoading] = useState<boolean>(false);
+
+  // Add debounce timer ref
+  const densitySaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Memoized numeric EBF value
   const ebfNumeric = useMemo(() => {
@@ -403,12 +407,21 @@ export default function LCACalculatorComponent(): JSX.Element {
 
           setModelledMaterials(materialsArray);
 
+          // Restore saved material densities
+          if (projectData.materialDensities) {
+            console.log("[loadProjectMaterials] Restoring material densities:", projectData.materialDensities);
+            setMaterialDensities(projectData.materialDensities);
+          } else {
+            console.log("[loadProjectMaterials] No saved material densities found");
+            setMaterialDensities({});
+          }
+
           if (kbobMaterials.length > 0) {
             const elementsWithCalculatedImpacts = calculateElementImpacts(
               conformingElementsInput,
               projectData.materialMappings || {},
               kbobMaterials,
-              materialDensities
+              projectData.materialDensities || materialDensities
             );
             setIfcElementsWithImpacts(elementsWithCalculatedImpacts);
           } else {
@@ -433,6 +446,7 @@ export default function LCACalculatorComponent(): JSX.Element {
           console.warn(`[loadProjectMaterials] No project data found for ${selectedProject.value}`);
           setModelledMaterials([]);
           setMatches({});
+          setMaterialDensities({});
           setEbfInput("");
           setProjectMetadata(null);
           setIfcResult({
@@ -452,6 +466,7 @@ export default function LCACalculatorComponent(): JSX.Element {
         );
         setModelledMaterials([]);
         setMatches({});
+        setMaterialDensities({});
         setEbfInput("");
         setIfcElementsWithImpacts([]);
         setProjectMetadata(null);
@@ -1007,14 +1022,12 @@ export default function LCACalculatorComponent(): JSX.Element {
   };
 
   const handleAbschliessen = async () => {
-    if (!selectedProject) {
-      return;
-    }
-
+    if (!selectedProject?.value) return;
     try {
       await saveProjectMaterials(selectedProject.value, {
         materialMappings: matches,
         ebfValue: ebfInput,
+        materialDensities: materialDensities,
       });
       setShowSuccessMessage(true);
     } catch (error) {
@@ -1022,11 +1035,48 @@ export default function LCACalculatorComponent(): JSX.Element {
     }
   };
 
+  const handleSave = async (_data: any): Promise<void> => {
+    if (!selectedProject?.value) {
+      throw new Error("No project selected");
+    }
+
+    const formattedData = {
+      materialMappings: matches,
+      ebfValue: ebfInput,
+      materialDensities: materialDensities,
+    };
+
+    await saveProjectMaterials(selectedProject.value, formattedData);
+  };
+
   const handleDensityUpdate = (materialId: string, density: number) => {
-    setMaterialDensities((prev) => ({
-      ...prev,
-      [materialId]: density,
-    }));
+    setMaterialDensities((prev) => {
+      const updated = {
+        ...prev,
+        [materialId]: density,
+      };
+
+      // Auto-save density changes with debouncing
+      if (selectedProject?.value) {
+        // Clear previous timer
+        if (densitySaveTimerRef.current) {
+          clearTimeout(densitySaveTimerRef.current);
+        }
+
+        // Set new timer for auto-save
+        densitySaveTimerRef.current = setTimeout(async () => {
+          try {
+            await saveMaterialDensities(selectedProject.value, updated);
+            console.log(`[Auto-save] Density saved for material ${materialId}: ${density}`);
+          } catch (error) {
+            console.error("[Auto-save] Failed to save density:", error);
+            // Optionally show a user notification here
+          }
+        }, 1000); // 1 second debounce
+      }
+
+      return updated;
+    });
   };
 
   const handleRemoveMaterial = (materialId: string) => {
@@ -1222,18 +1272,14 @@ export default function LCACalculatorComponent(): JSX.Element {
     handleAbschliessen();
   };
 
-  const handleSave = async (_data: any): Promise<void> => {
-    if (!selectedProject?.value) {
-      throw new Error("No project selected");
-    }
-
-    const formattedData = {
-      materialMappings: matches,
-      ebfValue: ebfInput,
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (densitySaveTimerRef.current) {
+        clearTimeout(densitySaveTimerRef.current);
+      }
     };
-
-    await saveProjectMaterials(selectedProject.value, formattedData);
-  };
+  }, []);
 
   return (
     <Box

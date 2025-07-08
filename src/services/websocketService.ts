@@ -52,6 +52,7 @@ export interface ProjectData {
     };
   };
   materialMappings: Record<string, string>;
+  materialDensities?: Record<string, number>;
   ebf?: number | null;
 }
 
@@ -148,6 +149,7 @@ export async function saveProjectMaterials(
   data: {
     materialMappings: Record<string, string>;
     ebfValue?: string;
+    materialDensities?: Record<string, number>;
   }
 ): Promise<void> {
   try {
@@ -159,6 +161,7 @@ export async function saveProjectMaterials(
       body: JSON.stringify({
         materialMappings: data.materialMappings,
         ebfValue: data.ebfValue,
+        materialDensities: data.materialDensities || {},
       }),
     });
     
@@ -186,6 +189,46 @@ export async function saveProjectMaterials(
     console.log('Project materials saved successfully:', result);
   } catch (error) {
     console.error(`Error saving project materials for ${projectId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Save only material densities to the server (for auto-save)
+ */
+export async function saveMaterialDensities(
+  projectId: string,
+  materialDensities: Record<string, number>
+): Promise<void> {
+  try {
+    const response = await fetch(`${API_URL}/api/projects/${projectId}/densities`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        materialDensities,
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = `HTTP error! status: ${response.status}`;
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.message || errorJson.error || errorMessage;
+      } catch {
+        if (errorText) {
+          errorMessage = errorText;
+        }
+      }
+      throw new Error(errorMessage);
+    }
+    
+    const result = await response.json();
+    console.log('Material densities saved successfully:', result);
+  } catch (error) {
+    console.error(`Error saving material densities for ${projectId}:`, error);
     throw error;
   }
 }

@@ -44,7 +44,7 @@ app.use(
         "The CORS policy for this site does not allow access from the specified Origin.";
       return callback(new Error(msg), false);
     },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
   })
@@ -226,6 +226,7 @@ app.get("/api/projects/:projectId/materials", async (req, res) => {
           totalImpact: savedLcaData?.ifcData?.totalImpact || { gwp: 0, ubp: 0, penr: 0 }
         },
         materialMappings: savedLcaData?.materialMappings || {},
+        materialDensities: savedLcaData?.materialDensities || {},
         ebf: savedLcaData?.ebf || null,
       };
 
@@ -244,11 +245,11 @@ app.get("/api/projects/:projectId/materials", async (req, res) => {
 app.post("/api/projects/:projectId/materials", async (req, res) => {
   try {
     const { projectId } = req.params;
-    const { materialMappings, ebfValue } = req.body;
-    // Note: We don't accept ifcData in the request body anymore - it's already in the database
+    const { materialMappings, ebfValue, materialDensities } = req.body;
     
     console.log(`[HTTP API] Saving materials for project: ${projectId}`);
     console.log(`[HTTP API] Material mappings count: ${Object.keys(materialMappings || {}).length}`);
+    console.log(`[HTTP API] Material densities count: ${Object.keys(materialDensities || {}).length}`);
     console.log(`[HTTP API] EBF value: ${ebfValue}`);
     
     const { lcaDb, qtoDb, client } = await connectToDatabases();
@@ -310,7 +311,8 @@ app.post("/api/projects/:projectId/materials", async (req, res) => {
           elementsBatch,
           materialMappings || {},
           kbobMaterials,
-          ebfValue || null
+          ebfValue || null,
+          materialDensities || {}
         );
 
         // Aggregate results
@@ -369,6 +371,7 @@ app.post("/api/projects/:projectId/materials", async (req, res) => {
           $set: {
             projectId,
             materialMappings,
+            materialDensities: materialDensities || {},
             ebf: ebfValue,
             totalImpact,
             impactsByCategory,
@@ -471,6 +474,54 @@ app.post("/api/test-kafka", async (req, res) => {
   } catch (error) {
     console.error("Error sending test Kafka message:", error);
     res.status(500).json({ error: `Failed to send test message: ${error}` });
+  }
+});
+
+// Add API endpoint to save material densities only
+app.patch("/api/projects/:projectId/densities", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { materialDensities } = req.body;
+    
+    console.log(`[HTTP API] Saving material densities for project: ${projectId}`);
+    console.log(`[HTTP API] Densities to save:`, materialDensities);
+    
+    const { lcaDb, client } = await connectToDatabases();
+
+    try {
+      const lcaResultsCollection = lcaDb.collection(config.mongodb.collections.lcaResults);
+      
+      // Update only the materialDensities field
+      const result = await lcaResultsCollection.updateOne(
+        { projectId },
+        {
+          $set: {
+            materialDensities: materialDensities || {},
+            lastDensityUpdate: new Date()
+          }
+        },
+        { upsert: true }
+      );
+
+      console.log(`[HTTP API] Material densities saved successfully`);
+
+      res.json({
+        success: true,
+        projectId,
+        densitiesSaved: Object.keys(materialDensities || {}).length,
+        modified: result.modifiedCount > 0,
+        upserted: result.upsertedCount > 0
+      });
+
+    } finally {
+      await client.close();
+    }
+  } catch (error) {
+    console.error("[HTTP API] Error saving material densities:", error);
+    res.status(500).json({ 
+      error: "Failed to save material densities",
+      message: error instanceof Error ? error.message : "Unknown error"
+    });
   }
 });
 
@@ -1000,6 +1051,7 @@ wss.on("connection", (ws) => {
                   elements: projectElements, // Send raw elements for Bauteile tab
                 },
                 materialMappings: savedLcaData?.materialMappings || {},
+                materialDensities: savedLcaData?.materialDensities || {},
                 ebf: savedLcaData?.ebf || null,
                 messageId: data.messageId,
               })
@@ -1018,6 +1070,7 @@ wss.on("connection", (ws) => {
                 },
                 ifcData: { materials: [], elements: [] }, // Send empty arrays
                 materialMappings: {},
+                materialDensities: {},
                 ebf: null,
                 messageId: data.messageId,
               })
@@ -1042,7 +1095,7 @@ wss.on("connection", (ws) => {
       // Handle saving project materials
       if (data.type === "save_project_materials") {
         console.log("Processing save_project_materials...");
-        const { projectId, materialMappings, ebfValue } = data; // Removed ifcData if not directly used
+        const { projectId, materialMappings, ebfValue, materialDensities } = data; // Removed ifcData if not directly used
         if (!projectId) {
           ws.send(
             JSON.stringify({
@@ -1127,7 +1180,8 @@ wss.on("connection", (ws) => {
           qtoElements,
           materialMappings || {}, // Ensure it's an object
           kbobMaterials,
-          ebfNumeric
+          ebfNumeric,
+          materialDensities || {} // Pass custom densities
         );
 
         console.log(
@@ -1157,6 +1211,7 @@ wss.on("connection", (ws) => {
               numberOfInstancesWithErrors:
                 calculationResult.numberOfInstancesWithErrors,
               materialMappings: materialMappings || {}, // Save the mappings used
+              materialDensities: materialDensities || {}, // Save material densities
               ebf: finalEbf, // Save the EBF used
               lastUpdated: new Date(),
               // Avoid storing the full 'ifcData' or large instance lists here unless necessary
