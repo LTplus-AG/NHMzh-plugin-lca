@@ -64,6 +64,10 @@ export interface KbobMaterial {
   id: string;
   nameDE: string;
   density?: number;
+  densityRange?: {
+    min: number;
+    max: number;
+  } | null;
   gwp?: number;
   ubp?: number;
   penr?: number;

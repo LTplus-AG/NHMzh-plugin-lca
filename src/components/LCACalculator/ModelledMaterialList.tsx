@@ -14,6 +14,7 @@ import {
   Chip,
   ToggleButtonGroup,
   ToggleButton,
+  Slider,
 } from "@mui/material";
 import { useTheme, alpha } from "@mui/material/styles";
 import Select from "react-select";
@@ -52,92 +53,6 @@ export interface ModelledMaterialListProps {
   aggregatedMaterialImpacts: Record<string, MaterialImpact>;
 }
 
-interface DensityDialogProps {
-  open: boolean;
-  onClose: () => void;
-  materialId: string;
-  materialName: string;
-  currentDensity: number;
-  densityRange: { min: number; max: number };
-  onSave: (density: number) => void;
-}
-
-const DensityDialog: React.FC<DensityDialogProps> = ({
-  open,
-  onClose,
-  materialName,
-  currentDensity,
-  densityRange,
-  onSave,
-}) => {
-  const [density, setDensity] = useState(currentDensity);
-  const [error, setError] = useState("");
-
-  const handleDensityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseFloat(e.target.value);
-    setDensity(value);
-    if (value < densityRange.min || value > densityRange.max) {
-      setError(
-        `Dichte muss zwischen ${densityRange.min} und ${densityRange.max} kg/m³ liegen`
-      );
-    } else {
-      setError("");
-    }
-  };
-
-  const handleSave = () => {
-    if (!error) {
-      onSave(density);
-      onClose();
-    }
-  };
-
-  return (
-    <Dialog open={open} onClose={onClose}>
-      <DialogTitle>
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-          <Typography variant="h6">Dichte bearbeiten</Typography>
-          <Typography variant="subtitle2" color="text.secondary">
-            {materialName}
-          </Typography>
-        </Box>
-      </DialogTitle>
-      <DialogContent>
-        <Box sx={{ mt: 2 }}>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
-            Gültige Dichte: {densityRange.min} - {densityRange.max} kg/m³
-          </Typography>
-          <TextField
-            fullWidth
-            type="number"
-            label="Dichte (kg/m³)"
-            value={density}
-            onChange={handleDensityChange}
-            error={!!error}
-            helperText={error}
-            sx={{ mt: 1 }}
-            InputProps={{
-              inputProps: {
-                min: densityRange.min,
-                max: densityRange.max,
-                step: "0.1",
-              },
-            }}
-          />
-        </Box>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} color="inherit">
-          Abbrechen
-        </Button>
-        <Button onClick={handleSave} color="primary" disabled={!!error}>
-          Speichern
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-};
-
 const ModelledMaterialList: React.FC<ModelledMaterialListProps> = ({
   modelledMaterials,
   kbobMaterials,
@@ -150,7 +65,6 @@ const ModelledMaterialList: React.FC<ModelledMaterialListProps> = ({
   outputFormat = OutputFormats.GWP,
   aggregatedMaterialImpacts,
 }) => {
-  const [editingDensity, setEditingDensity] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"none" | "matched" | "unmatched">(
     "none"
   );
@@ -307,6 +221,14 @@ const ModelledMaterialList: React.FC<ModelledMaterialListProps> = ({
         {sortedMaterials.map((material) => {
           const matchedKbobMaterial = getMatchedKbobMaterial(material.id);
           const emissionValue = getEmissionValue(material);
+          const hasDensityRange = matchedKbobMaterial?.densityRange !== undefined && 
+                                  matchedKbobMaterial?.densityRange !== null &&
+                                  matchedKbobMaterial.densityRange.min !== undefined &&
+                                  matchedKbobMaterial.densityRange.max !== undefined;
+          const currentDensity = materialDensities[material.id] || 
+            (hasDensityRange 
+              ? (matchedKbobMaterial.densityRange!.min + matchedKbobMaterial.densityRange!.max) / 2
+              : matchedKbobMaterial?.density || 0);
 
           return (
             <Grid item xs={12} sm={6} md={4} key={material.id}>
@@ -444,59 +366,357 @@ const ModelledMaterialList: React.FC<ModelledMaterialListProps> = ({
                   />
                 </Box>
 
-                {/* Emission Value (if matched) */}
-                {matchedKbobMaterial && emissionValue !== null && (
-                  <Box sx={{ mt: "auto", pt: 1 }}>
-                    <Chip
-                      label={`${emissionValue.toLocaleString("de-CH", {
-                        minimumFractionDigits: 3,
-                        maximumFractionDigits: 3,
-                      })} ${getEmissionUnit()}`}
-                      size="small"
-                      sx={{
-                        bgcolor: "success.lighter",
-                        color: "success.dark",
-                        fontWeight: 500,
-                        "& .MuiChip-label": {
-                          px: 1,
-                        },
-                      }}
-                    />
+                {/* Density Display and Slider (if material is matched) */}
+                {matchedKbobMaterial && (
+                  <Box 
+                    sx={{ 
+                      mb: 2,
+                      p: 2,
+                      bgcolor: theme.palette.grey[50],
+                      borderRadius: 1,
+                      border: `1px solid ${theme.palette.grey[200]}`,
+                    }}
+                  >
+                    {/* Header Row */}
+                    <Box sx={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center',
+                      mb: hasDensityRange ? 1.5 : 0,
+                    }}>
+                      {/* Density */}
+                      <Box>
+                        <Typography 
+                          variant="overline" 
+                          sx={{ 
+                            color: theme.palette.text.secondary,
+                            fontSize: '0.7rem',
+                            letterSpacing: '0.05em',
+                          }}
+                        >
+                          {hasDensityRange ? 'Dichte' : 'Dichte (fest)'}
+                        </Typography>
+                        <Typography 
+                          variant="h6" 
+                          sx={{ 
+                            fontWeight: 600,
+                            lineHeight: 1,
+                            mt: 0.25,
+                          }}
+                        >
+                          {currentDensity.toFixed(0)} <Typography component="span" variant="caption" color="text.secondary">kg/m³</Typography>
+                        </Typography>
+                      </Box>
+                      
+                      {/* Impact */}
+                      {emissionValue !== null && (
+                        <Box sx={{ textAlign: 'right' }}>
+                          <Typography 
+                            variant="overline" 
+                            sx={{ 
+                              color: theme.palette.text.secondary,
+                              fontSize: '0.7rem',
+                              letterSpacing: '0.05em',
+                            }}
+                          >
+                            {outputFormat}
+                          </Typography>
+                          <Typography 
+                            variant="h6" 
+                            sx={{ 
+                              fontWeight: 600,
+                              lineHeight: 1,
+                              mt: 0.25,
+                              color: theme.palette.primary.main,
+                            }}
+                          >
+                            {emissionValue.toLocaleString("de-CH", {
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 0,
+                            })} <Typography component="span" variant="caption" color="text.secondary">{getEmissionUnit()}</Typography>
+                          </Typography>
+                        </Box>
+                      )}
+                    </Box>
+                    
+                    {/* Slider for adjustable density */}
+                    {hasDensityRange && (
+                      <Box sx={{ mb: 0.5 }}>
+                        <Box sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center',
+                          gap: 1,
+                        }}>
+                          <Typography 
+                            variant="caption" 
+                            sx={{ 
+                              fontSize: '0.65rem',
+                              color: theme.palette.text.secondary,
+                              minWidth: 20,
+                              textAlign: 'right',
+                            }}
+                          >
+                            {matchedKbobMaterial.densityRange!.min}
+                          </Typography>
+                          
+                          <Box sx={{ flex: 1 }}>
+                            <Slider
+                              value={currentDensity}
+                              onChange={(_, value) => {
+                                if (handleDensityUpdate && typeof value === 'number') {
+                                  handleDensityUpdate(material.id, value);
+                                }
+                              }}
+                              min={matchedKbobMaterial.densityRange!.min}
+                              max={matchedKbobMaterial.densityRange!.max}
+                              step={1}
+                              valueLabelDisplay="auto"
+                              size="small"
+                              sx={{
+                                py: 0,
+                                '& .MuiSlider-thumb': {
+                                  backgroundColor: theme.palette.common.white,
+                                  border: `2px solid ${theme.palette.primary.main}`,
+                                  width: 16,
+                                  height: 16,
+                                  '&:hover': {
+                                    boxShadow: 'none',
+                                  },
+                                },
+                                '& .MuiSlider-track': {
+                                  backgroundColor: theme.palette.primary.main,
+                                  border: 'none',
+                                  height: 4,
+                                },
+                                '& .MuiSlider-rail': {
+                                  backgroundColor: theme.palette.grey[300],
+                                  height: 4,
+                                },
+                                '& .MuiSlider-valueLabel': {
+                                  backgroundColor: theme.palette.grey[700],
+                                  fontSize: 11,
+                                },
+                              }}
+                            />
+                          </Box>
+                          
+                          <Typography 
+                            variant="caption" 
+                            sx={{ 
+                              fontSize: '0.65rem',
+                              color: theme.palette.text.secondary,
+                              minWidth: 20,
+                              textAlign: 'left',
+                            }}
+                          >
+                            {matchedKbobMaterial.densityRange!.max}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    )}
+                    
+                    {/* Environmental Impact Scale */}
+                    {emissionValue !== null && material.volume > 0 && (
+                      <Box sx={{ 
+                        mt: hasDensityRange ? 1.5 : 2,
+                        pt: hasDensityRange ? 1.5 : 2,
+                        borderTop: `1px solid ${theme.palette.grey[200]}`,
+                      }}>
+                        {/* Scale Header */}
+                        <Box sx={{ 
+                          display: 'flex', 
+                          justifyContent: 'space-between',
+                          alignItems: 'baseline',
+                          mb: 1.5,
+                        }}>
+                          <Box>
+                            <Typography 
+                              variant="overline" 
+                              sx={{ 
+                                fontSize: '0.65rem',
+                                color: theme.palette.text.secondary,
+                                letterSpacing: '0.05em',
+                                display: 'block',
+                                lineHeight: 1,
+                              }}
+                            >
+                              Umweltbelastung
+                            </Typography>
+                            <Typography 
+                              variant="body2" 
+                              sx={{ 
+                                fontSize: '0.75rem',
+                                color: theme.palette.text.primary,
+                                fontWeight: 600,
+                                mt: 0.25,
+                              }}
+                            >
+                              {((emissionValue / material.volume)).toFixed(0)} {getEmissionUnit()}/m³
+                            </Typography>
+                          </Box>
+                          
+                          {/* Benchmark indicator */}
+                          <Typography 
+                            variant="caption" 
+                            sx={{ 
+                              fontSize: '0.65rem',
+                              color: (() => {
+                                const ratio = (emissionValue / material.volume) / 1000;
+                                if (ratio < 0.3) return theme.palette.success.main;
+                                if (ratio < 0.6) return theme.palette.warning.main;
+                                return theme.palette.error.main;
+                              })(),
+                              fontWeight: 600,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                            }}
+                          >
+                            {(() => {
+                              const ratio = (emissionValue / material.volume) / 1000;
+                              if (ratio < 0.3) return 'Niedrig';
+                              if (ratio < 0.6) return 'Mittel';
+                              return 'Hoch';
+                            })()}
+                          </Typography>
+                        </Box>
+                        
+                        {/* Scale Visualization */}
+                        <Box sx={{ position: 'relative' }}>
+                          {/* Background segments */}
+                          <Box sx={{ 
+                            display: 'flex',
+                            height: 8,
+                            borderRadius: 1,
+                            overflow: 'hidden',
+                            bgcolor: theme.palette.grey[100],
+                          }}>
+                            <Box sx={{ 
+                              width: '33.33%',
+                              bgcolor: alpha(theme.palette.success.main, 0.2),
+                              borderRight: `1px solid ${theme.palette.background.paper}`,
+                            }} />
+                            <Box sx={{ 
+                              width: '33.33%',
+                              bgcolor: alpha(theme.palette.warning.main, 0.2),
+                              borderRight: `1px solid ${theme.palette.background.paper}`,
+                            }} />
+                            <Box sx={{ 
+                              width: '33.34%',
+                              bgcolor: alpha(theme.palette.error.main, 0.2),
+                            }} />
+                          </Box>
+                          
+                          {/* Value indicator */}
+                          <Box sx={{
+                            position: 'absolute',
+                            top: -4,
+                            left: `${Math.min(((emissionValue / material.volume) / 1000) * 100, 98)}%`,
+                            transform: 'translateX(-50%)',
+                            transition: 'left 0.3s ease',
+                          }}>
+                            <Box sx={{
+                              width: 16,
+                              height: 16,
+                              bgcolor: theme.palette.background.paper,
+                              border: `2px solid ${(() => {
+                                const ratio = (emissionValue / material.volume) / 1000;
+                                if (ratio < 0.3) return theme.palette.success.main;
+                                if (ratio < 0.6) return theme.palette.warning.main;
+                                return theme.palette.error.main;
+                              })()}`,
+                              borderRadius: '50%',
+                              boxShadow: `0 2px 4px ${alpha(theme.palette.common.black, 0.1)}`,
+                            }} />
+                          </Box>
+                        </Box>
+                        
+                        {/* Scale labels with values */}
+                        <Box sx={{ 
+                          display: 'flex', 
+                          justifyContent: 'space-between',
+                          mt: 1,
+                          px: 0.5,
+                        }}>
+                          <Box sx={{ textAlign: 'center', flex: 1 }}>
+                            <Typography 
+                              variant="caption" 
+                              sx={{ 
+                                fontSize: '0.6rem',
+                                color: theme.palette.text.disabled,
+                                display: 'block',
+                                lineHeight: 1,
+                              }}
+                            >
+                              0-300
+                            </Typography>
+                            <Typography 
+                              variant="caption" 
+                              sx={{ 
+                                fontSize: '0.65rem',
+                                color: theme.palette.success.main,
+                                fontWeight: 500,
+                              }}
+                            >
+                              Niedrig
+                            </Typography>
+                          </Box>
+                          <Box sx={{ textAlign: 'center', flex: 1 }}>
+                            <Typography 
+                              variant="caption" 
+                              sx={{ 
+                                fontSize: '0.6rem',
+                                color: theme.palette.text.disabled,
+                                display: 'block',
+                                lineHeight: 1,
+                              }}
+                            >
+                              300-600
+                            </Typography>
+                            <Typography 
+                              variant="caption" 
+                              sx={{ 
+                                fontSize: '0.65rem',
+                                color: theme.palette.warning.main,
+                                fontWeight: 500,
+                              }}
+                            >
+                              Mittel
+                            </Typography>
+                          </Box>
+                          <Box sx={{ textAlign: 'center', flex: 1 }}>
+                            <Typography 
+                              variant="caption" 
+                              sx={{ 
+                                fontSize: '0.6rem',
+                                color: theme.palette.text.disabled,
+                                display: 'block',
+                                lineHeight: 1,
+                              }}
+                            >
+                              600+
+                            </Typography>
+                            <Typography 
+                              variant="caption" 
+                              sx={{ 
+                                fontSize: '0.65rem',
+                                color: theme.palette.error.main,
+                                fontWeight: 500,
+                              }}
+                            >
+                              Hoch
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Box>
+                    )}
                   </Box>
                 )}
+
               </Paper>
             </Grid>
           );
         })}
       </Grid>
-
-      {/* Density Dialog */}
-      {editingDensity && (
-        <DensityDialog
-          open={!!editingDensity}
-          onClose={() => setEditingDensity(null)}
-          materialId={editingDensity}
-          materialName={
-            modelledMaterials.find((m) => m.id === editingDensity)?.name || ""
-          }
-          currentDensity={
-            materialDensities[editingDensity] ||
-            kbobMaterials.find((k) => k.id === matches[editingDensity])
-              ?.density ||
-            0
-          }
-          densityRange={
-            kbobMaterials.find((k) => k.id === matches[editingDensity])
-              ?.densityRange || { min: 0, max: 5000 }
-          }
-          onSave={(density) => {
-            if (handleDensityUpdate) {
-              handleDensityUpdate(editingDensity, density);
-            }
-            setEditingDensity(null);
-          }}
-        />
-      )}
     </Box>
   );
 };

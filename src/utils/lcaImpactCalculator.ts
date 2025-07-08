@@ -24,7 +24,16 @@ export class LCAImpactCalculator {
     let density = materialDensities?.[material.id];
     // If custom density is invalid or missing, try KBOB density
     if (typeof density !== "number" || density <= 0) {
-      density = kbobMaterial.density;
+      // Check if KBOB material has a density range
+      if (kbobMaterial.densityRange && 
+          kbobMaterial.densityRange.min && 
+          kbobMaterial.densityRange.max) {
+        // Use middle value of density range as default
+        density = (kbobMaterial.densityRange.min + kbobMaterial.densityRange.max) / 2;
+      } else {
+        // Use fixed density if available
+        density = kbobMaterial.density;
+      }
     }
     // Final validation of density
     if (typeof density !== "number" || density <= 0) {
@@ -86,8 +95,20 @@ export class LCAImpactCalculator {
         const kbobMaterial = kbobMaterialMap.get(matchedKbobId);
         if (kbobMaterial && typeof material.volume === "number") {
           const volume = material.volume;
-          const density =
-            materialDensities[material.id] || kbobMaterial.density || 0;
+          
+          // Determine density
+          let density = materialDensities[material.id];
+          if (typeof density !== "number" || density <= 0) {
+            // Check for density range
+            if (kbobMaterial.densityRange && 
+                kbobMaterial.densityRange.min && 
+                kbobMaterial.densityRange.max) {
+              density = (kbobMaterial.densityRange.min + kbobMaterial.densityRange.max) / 2;
+            } else {
+              density = kbobMaterial.density || 0;
+            }
+          }
+          
           const mass = volume * density;
 
           if (mass > 0) {
