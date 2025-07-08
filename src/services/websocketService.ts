@@ -1,13 +1,8 @@
-// Remove this import to prevent circular dependency
-// import { initializeKafkaService } from './kafkaService';
+// HTTP-based service for LCA plugin
+// Replaces WebSocket with REST API calls following best practices
 
-// WebSocket connection options
-const WS_OPTIONS = {
-  reconnectInterval: 5000,
-  maxReconnectAttempts: 10,
-  pingInterval: 30000,
-  messageTimeout: 10000,
-};
+// API base URL from environment or default
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8002";
 
 // Connection status enum
 export enum ConnectionStatus {
@@ -23,7 +18,7 @@ export interface ProjectData {
   name: string;
   metadata: {
     filename: string;
-    upload_timestamp: string; // Matches the DB structure
+    upload_timestamp: string;
   };
   ifcData: {
     materials?: {
@@ -60,252 +55,30 @@ export interface ProjectData {
   ebf?: number | null;
 }
 
-// Global WebSocket instance
-let ws: WebSocket | null = null;
-let connectionStatus: ConnectionStatus = ConnectionStatus.DISCONNECTED;
-let reconnectAttempts = 0;
-let pingInterval: NodeJS.Timeout | null = null;
+// Connection status (simulated for backward compatibility)
+let connectionStatus: ConnectionStatus = ConnectionStatus.CONNECTED;
 
 // Event handlers
-const messageHandlers: ((data: any) => void)[] = [];
 const statusChangeHandlers: ((status: ConnectionStatus) => void)[] = [];
 
-// Get WebSocket URL from environment or use default
-const WS_URL = import.meta.env.VITE_WEBSOCKET_URL || "ws://localhost:8002";
-
 /**
- * Initialize WebSocket connection
+ * Initialize connection (simulated for backward compatibility)
  */
 export async function initWebSocket(): Promise<void> {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    console.log("WebSocket already connected");
-    return;
-  }
-
-  if (ws && ws.readyState === WebSocket.CONNECTING) {
-    console.log("WebSocket already connecting");
-    return;
-  }
-
   try {
-    console.log(`Initializing WebSocket connection to ${WS_URL}`);
-    ws = new WebSocket(WS_URL);
-    connectionStatus = ConnectionStatus.CONNECTING;
-    notifyStatusChange(connectionStatus);
-
-    ws.onopen = () => {
-      console.log("WebSocket connected");
+    // Test API connectivity
+    const response = await fetch(`${API_URL}/health`);
+    if (response.ok) {
       connectionStatus = ConnectionStatus.CONNECTED;
       notifyStatusChange(connectionStatus);
-      reconnectAttempts = 0;
-      startPingInterval();
-
-      // No need to initialize the Kafka service here anymore
-
-      notifyStatusChangeHandlers();
-
-      // Send a ping message to test connection
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "ping" }));
-      }
-    };
-
-    ws.onclose = () => {
-      console.log("WebSocket disconnected");
-      connectionStatus = ConnectionStatus.DISCONNECTED;
-      notifyStatusChange(connectionStatus);
-      if (pingInterval) {
-        clearInterval(pingInterval);
-        pingInterval = null;
-      }
-      attemptReconnect();
-    };
-
-    ws.onerror = (error) => {
-      console.error("WebSocket error:", error);
+    } else {
       connectionStatus = ConnectionStatus.ERROR;
       notifyStatusChange(connectionStatus);
-    };
-
-    ws.onmessage = handleMessage;
+    }
   } catch (error) {
-    console.error("Failed to initialize WebSocket:", error);
+    console.error("Failed to connect to API:", error);
     connectionStatus = ConnectionStatus.ERROR;
     notifyStatusChange(connectionStatus);
-    attemptReconnect();
-  }
-}
-
-/**
- * Attempt to reconnect to WebSocket
- */
-function attemptReconnect() {
-  if (reconnectAttempts >= WS_OPTIONS.maxReconnectAttempts) {
-    console.error("Max reconnection attempts reached");
-    return;
-  }
-
-  reconnectAttempts++;
-  setTimeout(() => {
-    console.log(
-      `Attempting to reconnect (${reconnectAttempts}/${WS_OPTIONS.maxReconnectAttempts})`
-    );
-    initWebSocket();
-  }, WS_OPTIONS.reconnectInterval);
-}
-
-/**
- * Start ping interval to keep connection alive
- */
-function startPingInterval() {
-  if (pingInterval) {
-    clearInterval(pingInterval);
-  }
-
-  pingInterval = setInterval(() => {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "ping" }));
-    }
-  }, WS_OPTIONS.pingInterval);
-}
-
-
-
-/**
- * Notify all message handlers
- */
-function notifyMessageHandlers(data: any) {
-  messageHandlers.forEach((handler) => {
-    try {
-      handler(data);
-    } catch (error) {
-      console.error("Error in message handler:", error);
-    }
-  });
-}
-
-/**
- * Notify all status change handlers
- */
-function notifyStatusChangeHandlers() {
-  statusChangeHandlers.forEach((handler) => {
-    try {
-      handler(connectionStatus);
-    } catch (error) {
-      console.error("Error in status change handler:", error);
-    }
-  });
-}
-
-/**
- * Register a message handler
- */
-export function onMessage(handler: (data: any) => void) {
-  messageHandlers.push(handler);
-  return () => {
-    const index = messageHandlers.indexOf(handler);
-    if (index !== -1) {
-      messageHandlers.splice(index, 1);
-    }
-  };
-}
-
-/**
- * Register a status change handler
- */
-export function onStatusChange(handler: (status: ConnectionStatus) => void) {
-  statusChangeHandlers.push(handler);
-  handler(connectionStatus);
-  return () => {
-    const index = statusChangeHandlers.indexOf(handler);
-    if (index !== -1) {
-      statusChangeHandlers.splice(index, 1);
-    }
-  };
-}
-
-/**
- * Send a request to the server and wait for response
- */
-export function sendRequest(
-  type: string,
-  data: any,
-  timeout = WS_OPTIONS.messageTimeout
-): Promise<any> {
-  return new Promise((resolve, reject) => {
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      reject(new Error("WebSocket not connected"));
-      return;
-    }
-
-    const messageId = `${type}_${Date.now()}_${Math.random()
-      .toString(36)
-      .substring(2)}`;
-    const message = { type, messageId, ...data };
-
-    const timeoutId = setTimeout(() => {
-      cleanup();
-      reject(new Error("Request timeout"));
-    }, timeout);
-
-    function handleResponse(response: any) {
-      if (response.messageId === messageId) {
-        cleanup();
-        resolve(response);
-      }
-    }
-
-    function cleanup() {
-      clearTimeout(timeoutId);
-      const index = messageHandlers.indexOf(handleResponse);
-      if (index !== -1) {
-        messageHandlers.splice(index, 1);
-      }
-    }
-
-    messageHandlers.push(handleResponse);
-    ws.send(JSON.stringify(message));
-  });
-}
-
-/**
- * Handle incoming messages
- */
-function handleMessage(event: MessageEvent) {
-  try {
-    const data = JSON.parse(event.data);
-    console.log("Received message:", data);
-
-    // Handle special message types
-    if (data.type === "pong") {
-      // Pong received, reset ping timeout
-      if (pingInterval) {
-        clearInterval(pingInterval);
-        pingInterval = null;
-      }
-      return;
-    }
-
-    // Handle Kafka status messages
-    if (data.type === "kafka_status") {
-      console.log("Kafka status update:", data.status);
-    }
-
-    // Handle test Kafka response
-    if (data.type === "test_kafka_response") {
-      console.log("Kafka test result:", data.success);
-    }
-
-    // Emit the message to all listeners for this type
-    notifyMessageHandlers(data);
-
-    // If there's a specific callback registered for this messageId, call it
-    if (data.messageId && messageHandlers[data.messageId]) {
-      messageHandlers[data.messageId](data);
-      delete messageHandlers[data.messageId];
-    }
-  } catch (error) {
-    console.error("Error parsing WebSocket message:", error);
   }
 }
 
@@ -323,27 +96,46 @@ function notifyStatusChange(status: ConnectionStatus) {
 }
 
 /**
+ * Register a status change handler
+ */
+export function onStatusChange(handler: (status: ConnectionStatus) => void) {
+  statusChangeHandlers.push(handler);
+  handler(connectionStatus);
+  return () => {
+    const index = statusChangeHandlers.indexOf(handler);
+    if (index !== -1) {
+      statusChangeHandlers.splice(index, 1);
+    }
+  };
+}
+
+/**
+ * Register a message handler (deprecated - kept for compatibility)
+ */
+export function onMessage(handler: (data: any) => void) {
+  // No-op for compatibility
+  return () => {};
+}
+
+/**
  * Get project materials from the server
  */
-export async function getProjectMaterials(
-  projectId: string
-): Promise<ProjectData> {
+export async function getProjectMaterials(projectId: string): Promise<ProjectData> {
   try {
-    // Auto-connect if not connected
-    if (!isConnected()) {
-      await initWebSocket();
-      // Wait a bit for connection to establish
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      if (!isConnected()) {
-        throw new Error("WebSocket not connected");
-      }
+    console.log(`[getProjectMaterials] Fetching materials for project: ${projectId}`);
+    const response = await fetch(`${API_URL}/api/projects/${projectId}/materials`);
+    
+    console.log(`[getProjectMaterials] Response status: ${response.status}`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-
-    const response = await sendRequest("get_project_materials", { projectId });
-    return response;
+    
+    const data = await response.json();
+    console.log(`[getProjectMaterials] Response data:`, data);
+    return data;
   } catch (error) {
-    console.error(`Error getting project materials for ${projectId}:`, error);
+    console.error(`[getProjectMaterials] Error getting project materials for ${projectId}:`, error);
     throw error;
   }
 }
@@ -354,30 +146,44 @@ export async function getProjectMaterials(
 export async function saveProjectMaterials(
   projectId: string,
   data: {
-    ifcData: any;
     materialMappings: Record<string, string>;
     ebfValue?: string;
   }
 ): Promise<void> {
   try {
-    // Auto-connect if not connected
-    if (!isConnected()) {
-      await initWebSocket();
-      // Wait a bit for connection to establish
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      if (!isConnected()) {
-        throw new Error("WebSocket not connected");
-      }
-    }
-
-    // Include ebfValue in the data sent to the server
-    await sendRequest("save_project_materials", {
-      projectId,
-      ifcData: data.ifcData,
-      materialMappings: data.materialMappings,
-      ebfValue: data.ebfValue,
+    const response = await fetch(`${API_URL}/api/projects/${projectId}/materials`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        materialMappings: data.materialMappings,
+        ebfValue: data.ebfValue,
+      }),
     });
+    
+    if (response.status === 413) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Request payload too large. Please contact support if this persists.');
+    }
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = `HTTP error! status: ${response.status}`;
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.message || errorJson.error || errorMessage;
+      } catch {
+        // If not JSON, use the text
+        if (errorText) {
+          errorMessage = errorText;
+        }
+      }
+      throw new Error(errorMessage);
+    }
+    
+    const result = await response.json();
+    console.log('Project materials saved successfully:', result);
   } catch (error) {
     console.error(`Error saving project materials for ${projectId}:`, error);
     throw error;
@@ -389,30 +195,29 @@ export async function saveProjectMaterials(
  */
 export async function getProjects(): Promise<{ id: string; name: string }[]> {
   try {
-    // Auto-connect if not connected
-    if (!isConnected()) {
-      await initWebSocket();
-      // Wait a bit for connection to establish
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      if (!isConnected()) {
-        throw new Error("WebSocket not connected");
-      }
+    console.log(`[getProjects] Fetching projects from: ${API_URL}/api/projects`);
+    const response = await fetch(`${API_URL}/api/projects`);
+    
+    console.log(`[getProjects] Response status: ${response.status}`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-
-    const response = await sendRequest("get_projects", {});
-    return response.projects || [];
+    
+    const data = await response.json();
+    console.log(`[getProjects] Response data:`, data);
+    return data.projects || [];
   } catch (error) {
-    console.error("Error getting projects:", error);
+    console.error("[getProjects] Error getting projects:", error);
     throw error;
   }
 }
 
 /**
- * Check if WebSocket is connected
+ * Check if connected (always returns true for HTTP)
  */
 export function isConnected(): boolean {
-  return ws !== null && ws.readyState === WebSocket.OPEN;
+  return connectionStatus === ConnectionStatus.CONNECTED;
 }
 
 /**
@@ -422,16 +227,43 @@ export function getConnectionStatus(): ConnectionStatus {
   return connectionStatus;
 }
 
-// Add a new method to handle sending test Kafka messages
+/**
+ * Send test Kafka message (via HTTP)
+ */
 export function sendTestKafkaMessage() {
-  return sendRequest("send_test_kafka", {
-    messageId: `test_kafka_${Date.now()}`,
-  });
+  return fetch(`${API_URL}/api/test-kafka`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      messageId: `test_kafka_${Date.now()}`,
+    }),
+  }).then(response => response.json());
 }
 
 /**
- * Get the WebSocket instance
+ * Get WebSocket instance (deprecated - returns null)
  */
 export function getWebSocket(): WebSocket | null {
-  return ws;
+  return null;
+}
+
+/**
+ * Send request (deprecated - for compatibility)
+ */
+export function sendRequest(type: string, data: any, timeout?: number): Promise<any> {
+  // Map old WebSocket request types to HTTP endpoints
+  switch (type) {
+    case 'get_project_materials':
+      return getProjectMaterials(data.projectId);
+    case 'save_project_materials':
+      return saveProjectMaterials(data.projectId, data);
+    case 'get_projects':
+      return getProjects().then(projects => ({ projects }));
+    case 'send_test_kafka':
+      return sendTestKafkaMessage();
+    default:
+      return Promise.reject(new Error(`Unknown request type: ${type}`));
+  }
 }

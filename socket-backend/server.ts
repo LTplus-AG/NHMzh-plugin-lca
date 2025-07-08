@@ -10,7 +10,7 @@ import path from "path";
 import { seedKbobData } from "./dbSeeder";
 import { config } from "./config"; // Import shared config
 import { LcaCalculationService } from "./LcaCalculationService";
-import { KbobMaterial, MaterialInstanceResult } from "./types";
+import { KbobMaterial, MaterialInstanceResult, LcaImpact, LcaData, IfcFileData, QtoElement as QtoElementType } from "./types";
 
 // Add variables to hold the DB connection (declared after imports)
 let lcaDbInstance: Db | null = null;
@@ -50,7 +50,21 @@ app.use(
   })
 );
 
-app.use(express.json());
+// Use reasonable JSON body size limit (1MB) and implement pagination for large datasets
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ limit: '1mb', extended: true }));
+
+// Add request size validation middleware
+app.use((req, res, next) => {
+  if (req.headers['content-length'] && parseInt(req.headers['content-length']) > 1048576) {
+    return res.status(413).json({
+      error: 'Payload too large. Please use pagination or batch processing for large datasets.',
+      maxSize: '1MB',
+      recommendation: 'Use the paginated endpoints or batch upload for large data'
+    });
+  }
+  next();
+});
 
 // Add API endpoint to fetch KBOB materials
 app.get("/api/kbob/materials", async (req, res) => {
@@ -78,6 +92,386 @@ app.get("/api/kbob/materials", async (req, res) => {
 // Add health check endpoint
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "healthy" });
+});
+
+// Add API endpoint to get projects
+app.get("/api/projects", async (req, res) => {
+  try {
+    let client;
+    let qtoDb;
+
+    try {
+      client = new MongoClient(config.mongodb.uri);
+      await client.connect();
+      qtoDb = client.db(config.mongodb.qtoDatabase);
+    } catch (error: any) {
+      console.warn(`Failed to connect using URI for projects: ${error.message}`);
+      const fallbackUri = "mongodb://mongodb:27017/?authSource=admin";
+      client = new MongoClient(fallbackUri, {
+        auth: {
+          username: "admin",
+          password: "secure_password",
+        },
+      });
+      await client.connect();
+      qtoDb = client.db(config.mongodb.qtoDatabase);
+    }
+
+    const projects = await qtoDb.collection("projects").find({}).toArray();
+    const formattedProjects = projects.map((project: any) => ({
+      id: project._id.toString(),
+      name: project.name,
+    }));
+
+    await client.close();
+    res.json({ projects: formattedProjects });
+  } catch (error) {
+    console.error("Error fetching projects:", error);
+    res.status(500).json({ error: "Failed to fetch projects" });
+  }
+});
+
+// Add API endpoint to get project materials
+app.get("/api/projects/:projectId/materials", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    console.log(`[HTTP API] Getting materials for project: ${projectId}`);
+    const { lcaDb, qtoDb, client } = await connectToDatabases();
+
+    try {
+      // Get project details and materials
+      const projectObjectId = new ObjectId(projectId);
+      const project = await qtoDb.collection("projects").findOne({ _id: projectObjectId });
+      
+      if (!project) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+
+      // Get saved LCA data
+      const lcaResultsCollection = lcaDb.collection(config.mongodb.collections.lcaResults);
+      const savedLcaData = await lcaResultsCollection.findOne({ projectId });
+
+      // Get elements from QTO database
+      let projectElements: QtoElementType[] = [];
+      
+      // Try first with ObjectId
+      projectElements = (await qtoDb
+        .collection("elements")
+        .find({
+          project_id: projectObjectId,
+          status: "active", // Only use elements that have been approved
+        })
+        .toArray()) as QtoElementType[];
+
+      // If the first query didn't return any elements, try with string ID
+      if (projectElements.length === 0) {
+        projectElements = (await qtoDb
+          .collection("elements")
+          .find({
+            project_id: projectId,
+            status: "active", // Only use elements that have been approved
+          })
+          .toArray()) as QtoElementType[];
+        console.log(`[HTTP API] Found ${projectElements.length} elements using string project_id`);
+      }
+
+      console.log(`[HTTP API] Found ${projectElements.length} active elements for project ${project.name}`);
+
+      // Process elements to extract materials and build the response
+      let materials: { name: string; volume: number }[] = [];
+      
+      if (projectElements.length > 0) {
+        const materialMap = new Map<string, number>();
+
+        projectElements.forEach((element: QtoElementType) => {
+          const materialsArray = element.materials;
+
+          if (Array.isArray(materialsArray) && materialsArray.length > 0) {
+            materialsArray.forEach((material) => {
+              if (material && typeof material === "object" && typeof material.name === "string") {
+                const name = normalizeMaterialName(material.name);
+                const volume = parseFloat(
+                  typeof material.volume === "string"
+                    ? material.volume
+                    : material.volume?.toString() || "0"
+                );
+
+                if (!isNaN(volume) && volume > 0) {
+                  materialMap.set(name, (materialMap.get(name) || 0) + volume);
+                }
+              }
+            });
+          }
+        });
+
+        // Convert to array format expected by frontend
+        materials = Array.from(materialMap).map(([name, volume]) => ({
+          name,
+          volume,
+        }));
+
+        console.log(`[HTTP API] Aggregated ${materials.length} unique materials`);
+      }
+
+      const response = {
+        projectId,
+        name: project.name,
+        metadata: {
+          filename: project.metadata?.filename || "Unknown file",
+          upload_timestamp: project.metadata?.upload_timestamp || new Date().toISOString(),
+        },
+        ifcData: {
+          materials: materials,
+          elements: projectElements, // Send the actual elements from QTO
+          totalImpact: savedLcaData?.ifcData?.totalImpact || { gwp: 0, ubp: 0, penr: 0 }
+        },
+        materialMappings: savedLcaData?.materialMappings || {},
+        ebf: savedLcaData?.ebf || null,
+      };
+
+      console.log(`[HTTP API] Sending response with ${projectElements.length} elements and ${materials.length} materials`);
+      res.json(response);
+    } finally {
+      await client.close();
+    }
+  } catch (error) {
+    console.error("[HTTP API] Error fetching project materials:", error);
+    res.status(500).json({ error: "Failed to fetch project materials" });
+  }
+});
+
+// Add API endpoint to save project materials
+app.post("/api/projects/:projectId/materials", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { materialMappings, ebfValue } = req.body;
+    // Note: We don't accept ifcData in the request body anymore - it's already in the database
+    
+    console.log(`[HTTP API] Saving materials for project: ${projectId}`);
+    console.log(`[HTTP API] Material mappings count: ${Object.keys(materialMappings || {}).length}`);
+    console.log(`[HTTP API] EBF value: ${ebfValue}`);
+    
+    const { lcaDb, qtoDb, client } = await connectToDatabases();
+
+    try {
+      // 1. Fetch QTO Project Metadata (for Kafka)
+      let kafkaMetadata: KafkaMetadata | null = null;
+      const qtoProject = await qtoDb.collection("projects").findOne(
+        { _id: new ObjectId(projectId) },
+        {
+          projection: {
+            name: 1,
+            metadata: 1,
+            "_id": 1
+          }
+        }
+      );
+
+      if (qtoProject) {
+        kafkaMetadata = {
+          project: qtoProject.name,
+          filename: qtoProject.metadata?.filename || "unknown.ifc",
+          timestamp: new Date().toISOString(),
+          fileId: qtoProject._id.toString()
+        };
+      }
+
+      // 2. Fetch elements from QTO database (paginated if needed)
+      const elementsCollection = qtoDb.collection("elements");
+      const totalElements = await elementsCollection.countDocuments({
+        project_id: new ObjectId(projectId),
+        status: "active"
+      });
+
+      console.log(`[HTTP API] Total elements to process: ${totalElements}`);
+
+      // Process elements in batches to avoid memory issues
+      const batchSize = 1000;
+      let allMaterialInstances: MaterialInstanceResult[] = [];
+      
+      // 3. Fetch KBOB materials
+      const kbobMaterials = await lcaDb.collection(config.mongodb.collections.materialLibrary).find({}).toArray() as unknown as KbobMaterial[];
+
+      // Process elements in batches
+      for (let skip = 0; skip < totalElements; skip += batchSize) {
+        const elementsBatch = await elementsCollection
+          .find({
+            project_id: new ObjectId(projectId),
+            status: "active"
+          })
+          .skip(skip)
+          .limit(batchSize)
+          .toArray() as QtoElementType[];
+
+        console.log(`[HTTP API] Processing batch: ${skip + 1} to ${Math.min(skip + batchSize, totalElements)}`);
+
+        // Calculate LCA for this batch using existing service
+        const batchResults = LcaCalculationService.calculateLcaResults(
+          elementsBatch,
+          materialMappings || {},
+          kbobMaterials,
+          ebfValue || null
+        );
+
+        // Aggregate results
+        allMaterialInstances.push(...batchResults.materialInstances);
+      }
+
+      // 4. Calculate totals
+      const totalImpact: LcaImpact = allMaterialInstances.reduce(
+        (acc, instance) => ({
+          gwp: acc.gwp + instance.gwp_absolute,
+          ubp: acc.ubp + instance.ubp_absolute,
+          penr: acc.penr + instance.penr_absolute
+        }),
+        { gwp: 0, ubp: 0, penr: 0 }
+      );
+
+      // Create impact summaries by category and material
+      const impactsByCategory: Record<string, LcaImpact> = {};
+      const impactsByMaterial: Record<string, LcaImpact & { quantity: number; unit: string }> = {};
+
+      allMaterialInstances.forEach(instance => {
+        // Group by EBKP category
+        if (instance.ebkp_code) {
+          const category = instance.ebkp_code.substring(0, 1); // First character is the category
+          if (!impactsByCategory[category]) {
+            impactsByCategory[category] = { gwp: 0, ubp: 0, penr: 0 };
+          }
+          impactsByCategory[category].gwp += instance.gwp_absolute;
+          impactsByCategory[category].ubp += instance.ubp_absolute;
+          impactsByCategory[category].penr += instance.penr_absolute;
+        }
+
+        // Group by material
+        const materialKey = instance.kbob_id || instance.material_name;
+        if (!impactsByMaterial[materialKey]) {
+          impactsByMaterial[materialKey] = {
+            gwp: 0,
+            ubp: 0,
+            penr: 0,
+            quantity: 0,
+            unit: 'kg'
+          };
+        }
+        impactsByMaterial[materialKey].gwp += instance.gwp_absolute;
+        impactsByMaterial[materialKey].ubp += instance.ubp_absolute;
+        impactsByMaterial[materialKey].penr += instance.penr_absolute;
+        impactsByMaterial[materialKey].quantity += 1; // Count instances
+      });
+
+      // 5. Save results
+      const lcaResultsCollection = lcaDb.collection(config.mongodb.collections.lcaResults);
+      
+      await lcaResultsCollection.updateOne(
+        { projectId },
+        {
+          $set: {
+            projectId,
+            materialMappings,
+            ebf: ebfValue,
+            totalImpact,
+            impactsByCategory,
+            impactsByMaterial,
+            numberOfInstancesProcessed: allMaterialInstances.length,
+            numberOfInstancesWithErrors: 0, // TODO: Track errors properly
+            lastUpdated: new Date()
+          }
+        },
+        { upsert: true }
+      );
+
+      console.log(`[HTTP API] LCA calculation completed. Processed ${allMaterialInstances.length} material instances`);
+      console.log(`[HTTP API] Total impacts:`, totalImpact);
+
+      // 6. Send to Kafka (if metadata available)
+      if (kafkaMetadata && allMaterialInstances.length > 0) {
+        // Send material instances directly to Kafka using the existing method
+        try {
+          const success = await kafkaService.sendLcaBatchToKafka(
+            allMaterialInstances,
+            kafkaMetadata
+          );
+          if (success) {
+            console.log(`[HTTP API] Successfully sent ${allMaterialInstances.length} material instances to Kafka`);
+          } else {
+            console.error(`[HTTP API] Failed to send some or all batches to Kafka`);
+          }
+        } catch (kafkaError) {
+          console.error(`[HTTP API] Error sending to Kafka:`, kafkaError);
+          // Continue even if Kafka fails - the data is saved in MongoDB
+        }
+      }
+
+      res.json({
+        success: true,
+        projectId,
+        processedElements: allMaterialInstances.length,
+        totalImpact,
+        savedAt: new Date()
+      });
+
+    } finally {
+      await client.close();
+    }
+  } catch (error) {
+    console.error("[HTTP API] Error in save project materials:", error);
+    res.status(500).json({ 
+      error: "Failed to save project materials",
+      message: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
+// Add API endpoint for test Kafka message
+app.post("/api/test-kafka", async (req, res) => {
+  try {
+    const testElement: LcaElementData = {
+      id: `test_element_${Date.now()}`,
+      category: "ifcwall",
+      level: "Level 1",
+      is_structural: true,
+      materials: [
+        {
+          name: "Concrete",
+          volume: 10,
+          impact: {
+            gwp: 10.5,
+            ubp: 1050,
+            penr: 25.3,
+          },
+        },
+      ],
+      impact: {
+        gwp: 10.5,
+        ubp: 1050,
+        penr: 25.3,
+      },
+      sequence: 0,
+    };
+
+    const testKafkaMetadata: KafkaMetadata = {
+      project: "Test Project",
+      filename: "test.ifc",
+      timestamp: new Date().toISOString(),
+      fileId: `test_${Date.now()}`,
+    };
+
+    const testTotals = { totalGwp: 0, totalUbp: 0, totalPenr: 0 };
+    const result = await kafkaService.sendLcaBatchToKafkaLegacy(
+      [testElement],
+      testKafkaMetadata,
+      testTotals
+    );
+
+    res.json({
+      success: result,
+      message: result ? "Test message sent successfully" : "Failed to send test message",
+    });
+  } catch (error) {
+    console.error("Error sending test Kafka message:", error);
+    res.status(500).json({ error: `Failed to send test message: ${error}` });
+  }
 });
 
 const server = createServer(app);
@@ -402,7 +796,7 @@ wss.on("connection", (ws) => {
           });
 
           let projectName = "New Project";
-          let projectElements: QtoElement[] = [];
+          let projectElements: QtoElementType[] = [];
           let projectMetadata: {
             filename: string;
             upload_timestamp: string;
@@ -460,7 +854,7 @@ wss.on("connection", (ws) => {
                   project_id: projectObjectId,
                   status: "active", // Only use elements that have been approved
                 })
-                .toArray()) as QtoElement[];
+                .toArray()) as QtoElementType[];
 
               // If the first query didn't return any elements, try with string ID
               if (projectElements.length === 0) {
@@ -470,7 +864,7 @@ wss.on("connection", (ws) => {
                     project_id: projectId,
                     status: "active", // Only use elements that have been approved
                   })
-                  .toArray()) as QtoElement[];
+                  .toArray()) as QtoElementType[];
                 console.log(
                   `Found ${projectElements.length} elements using string project_id`
                 );
@@ -487,7 +881,7 @@ wss.on("connection", (ws) => {
                     project_id: { $exists: true },
                     status: "active", // Only use elements that have been approved
                   })
-                  .toArray()) as QtoElement[];
+                  .toArray()) as QtoElementType[];
 
                 // Filter the elements to match only those with matching project_id
                 projectElements = projectElements.filter((el) => {
@@ -545,7 +939,7 @@ wss.on("connection", (ws) => {
             console.log("Creating material aggregation from elements");
             const materialMap = new Map<string, number>();
 
-            projectElements.forEach((element: QtoElement) => {
+            projectElements.forEach((element: QtoElementType) => {
               const materialsArray = element.materials; // Get the array
 
               if (Array.isArray(materialsArray) && materialsArray.length > 0) {
@@ -718,7 +1112,7 @@ wss.on("connection", (ws) => {
         // 2. Fetch necessary data for LCA Calculation
         const [qtoElements, kbobMaterials] = await Promise.all([
           qtoDb
-            .collection<QtoElement>("elements") // Use interface
+            .collection<QtoElementType>("elements") // Use interface
             .find({ project_id: new ObjectId(projectId), status: "active" })
             .toArray(),
           lcaDb.collection<KbobMaterial>("materialLibrary").find({}).toArray(), // Use interface
