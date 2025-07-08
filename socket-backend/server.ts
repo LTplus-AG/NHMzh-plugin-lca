@@ -109,8 +109,8 @@ app.get("/api/projects", async (req, res) => {
       const fallbackUri = "mongodb://mongodb:27017/?authSource=admin";
       client = new MongoClient(fallbackUri, {
         auth: {
-          username: "admin",
-          password: "secure_password",
+          username: process.env.MONGODB_USERNAME || "admin",
+          password: process.env.MONGODB_PASSWORD || "admin",
         },
       });
       await client.connect();
@@ -716,8 +716,8 @@ wss.on("connection", (ws) => {
             const fallbackUri = "mongodb://mongodb:27017/?authSource=admin";
             client = new MongoClient(fallbackUri, {
               auth: {
-                username: "admin",
-                password: "secure_password",
+                username: process.env.MONGODB_USERNAME || "admin",
+                password: process.env.MONGODB_PASSWORD || "admin",
               },
             });
             await client.connect();
@@ -820,8 +820,8 @@ wss.on("connection", (ws) => {
               const fallbackUri = "mongodb://mongodb:27017/?authSource=admin";
               client = new MongoClient(fallbackUri, {
                 auth: {
-                  username: "admin",
-                  password: "secure_password",
+                  username: process.env.MONGODB_USERNAME || "admin",
+                  password: process.env.MONGODB_PASSWORD || "admin",
                 },
               });
               await client.connect();

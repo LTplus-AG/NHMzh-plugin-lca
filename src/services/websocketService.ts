@@ -4,6 +4,29 @@
 // API base URL from environment or default
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8002";
 
+// Validate API_URL format
+function validateUrl(url: string): boolean {
+  try {
+    const urlObj = new URL(url);
+    // Ensure it's HTTP or HTTPS protocol
+    return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+// Validate the API URL and use a safe fallback if invalid
+const VALIDATED_API_URL = (() => {
+  if (validateUrl(API_URL)) {
+    return API_URL;
+  }
+  console.error(`Invalid API URL: ${API_URL}. Falling back to default.`);
+  return "http://localhost:8002";
+})();
+
+// Use VALIDATED_API_URL for all API calls
+const API_BASE = VALIDATED_API_URL;
+
 // Connection status enum
 export enum ConnectionStatus {
   CONNECTING = "CONNECTING",
@@ -67,7 +90,7 @@ const statusChangeHandlers: ((status: ConnectionStatus) => void)[] = [];
 export async function initWebSocket(): Promise<void> {
   try {
     // Test API connectivity
-    const response = await fetch(`${API_URL}/health`);
+    const response = await fetch(`${API_BASE}/health`);
     if (response.ok) {
       connectionStatus = ConnectionStatus.CONNECTED;
       notifyStatusChange(connectionStatus);
@@ -123,7 +146,7 @@ export function onMessage(handler: (data: any) => void) {
 export async function getProjectMaterials(projectId: string): Promise<ProjectData> {
   try {
     console.log(`[getProjectMaterials] Fetching materials for project: ${projectId}`);
-    const response = await fetch(`${API_URL}/api/projects/${projectId}/materials`);
+    const response = await fetch(`${API_BASE}/api/projects/${projectId}/materials`);
     
     console.log(`[getProjectMaterials] Response status: ${response.status}`);
     
@@ -151,7 +174,7 @@ export async function saveProjectMaterials(
   }
 ): Promise<void> {
   try {
-    const response = await fetch(`${API_URL}/api/projects/${projectId}/materials`, {
+    const response = await fetch(`${API_BASE}/api/projects/${projectId}/materials`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -195,8 +218,8 @@ export async function saveProjectMaterials(
  */
 export async function getProjects(): Promise<{ id: string; name: string }[]> {
   try {
-    console.log(`[getProjects] Fetching projects from: ${API_URL}/api/projects`);
-    const response = await fetch(`${API_URL}/api/projects`);
+    console.log(`[getProjects] Fetching projects from: ${API_BASE}/api/projects`);
+    const response = await fetch(`${API_BASE}/api/projects`);
     
     console.log(`[getProjects] Response status: ${response.status}`);
     
@@ -231,7 +254,7 @@ export function getConnectionStatus(): ConnectionStatus {
  * Send test Kafka message (via HTTP)
  */
 export function sendTestKafkaMessage() {
-  return fetch(`${API_URL}/api/test-kafka`, {
+  return fetch(`${API_BASE}/api/test-kafka`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
