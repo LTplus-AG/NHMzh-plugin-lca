@@ -269,10 +269,17 @@ app.post("/api/projects/:projectId/materials", async (req, res) => {
       );
 
       if (qtoProject) {
+        // Get the original timestamp from metadata
+        const originalTimestamp = qtoProject.metadata?.upload_timestamp;
+        
+        if (!originalTimestamp) {
+          console.error(`Original upload_timestamp missing in metadata for project ${projectId}. Using current time as fallback.`);
+        }
+        
         kafkaMetadata = {
           project: qtoProject.name,
           filename: qtoProject.metadata?.filename || "unknown.ifc",
-          timestamp: new Date().toISOString(),
+          timestamp: originalTimestamp || new Date().toISOString(), // Preserve original timestamp exactly
           fileId: qtoProject._id.toString()
         };
       }
@@ -456,7 +463,7 @@ app.post("/api/test-kafka", async (req, res) => {
     const testKafkaMetadata: KafkaMetadata = {
       project: "Test Project",
       filename: "test.ifc",
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString(), // Test message can use current time
       fileId: `test_${Date.now()}`,
     };
 
@@ -710,7 +717,7 @@ wss.on("connection", (ws) => {
           const testKafkaMetadata: KafkaMetadata = {
             project: "Test Project",
             filename: "test.ifc",
-            timestamp: new Date().toISOString(),
+            timestamp: new Date().toISOString(), // Test message can use current time
             fileId: `test_${Date.now()}`, // Corrected Date usage
           };
 
@@ -1138,8 +1145,8 @@ wss.on("connection", (ws) => {
               kafkaMetadata = {
                 project: qtoProject.name || `Project_${projectId}`,
                 filename: qtoProject.metadata?.filename || "unknown.ifc",
-                // Use ONLY the original timestamp
-                timestamp: new Date(originalTimestamp).toISOString(),
+                // Use ONLY the original timestamp - preserve exactly
+                timestamp: originalTimestamp,
                 fileId: qtoProject.metadata?.file_id || projectId.toString(),
               };
             }
@@ -1302,8 +1309,8 @@ wss.on("connection", (ws) => {
               kafkaMetadata = {
                 project: qtoProject.name || `Project_${projectId}`,
                 filename: qtoProject.metadata?.filename || "unknown.ifc",
-                // Use ONLY the original timestamp
-                timestamp: new Date(originalTimestamp).toISOString(),
+                // Use ONLY the original timestamp - preserve exactly
+                timestamp: originalTimestamp,
                 fileId: qtoProject.metadata?.file_id || projectId.toString(),
               };
             }
