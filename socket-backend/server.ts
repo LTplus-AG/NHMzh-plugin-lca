@@ -279,7 +279,7 @@ app.post("/api/projects/:projectId/materials", async (req, res) => {
         kafkaMetadata = {
           project: qtoProject.name,
           filename: qtoProject.metadata?.filename || "unknown.ifc",
-          timestamp: originalTimestamp || new Date().toISOString(), // Preserve original timestamp exactly
+          timestamp: originalTimestamp ? new Date(originalTimestamp).toISOString() : new Date().toISOString(),
           fileId: qtoProject._id.toString()
         };
       }
@@ -1145,8 +1145,8 @@ wss.on("connection", (ws) => {
               kafkaMetadata = {
                 project: qtoProject.name || `Project_${projectId}`,
                 filename: qtoProject.metadata?.filename || "unknown.ifc",
-                // Use ONLY the original timestamp - preserve exactly
-                timestamp: originalTimestamp,
+                // Use ONLY the original timestamp
+                timestamp: new Date(originalTimestamp).toISOString(),
                 fileId: qtoProject.metadata?.file_id || projectId.toString(),
               };
             }
@@ -1309,8 +1309,8 @@ wss.on("connection", (ws) => {
               kafkaMetadata = {
                 project: qtoProject.name || `Project_${projectId}`,
                 filename: qtoProject.metadata?.filename || "unknown.ifc",
-                // Use ONLY the original timestamp - preserve exactly
-                timestamp: originalTimestamp,
+                // Use ONLY the original timestamp
+                timestamp: new Date(originalTimestamp).toISOString(),
                 fileId: qtoProject.metadata?.file_id || projectId.toString(),
               };
             }
