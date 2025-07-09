@@ -7,6 +7,7 @@ import {
   MaterialInstanceResult,
   LcaImpact,
 } from "./types";
+import logger from "./logger";
 
 dotenv.config();
 
@@ -40,7 +41,7 @@ class KafkaService {
 
   // Configuration
   private config = {
-    clientId: "plugin-lca-websocket",
+    clientId: "plugin-lca",
     broker: process.env.KAFKA_BROKER || "broker:29092",
     qtoTopic: process.env.KAFKA_TOPIC_QTO || "qto-elements",
     lcaTopic: process.env.KAFKA_TOPIC_LCA || "lca-data",
@@ -66,18 +67,18 @@ class KafkaService {
   async initialize(): Promise<boolean> {
     try {
       await this.admin.connect();
-      console.log(`Connected to Kafka admin on broker: ${this.config.broker}`);
+      logger.info(`Connected to Kafka admin on broker: ${this.config.broker}`);
       await this.ensureTopicExists(this.config.qtoTopic);
       await this.ensureTopicExists(this.config.lcaTopic);
       this.lcaTopicReady = true;
       await this.admin.disconnect();
       await this.producer.connect();
-      console.log(`Producer connected to Kafka broker: ${this.config.broker}`);
+      logger.info(`Producer connected to Kafka broker: ${this.config.broker}`);
       this.isProducerConnected = true;
       this.isConnected = true;
       return true;
     } catch (error) {
-      console.error("Failed to initialize Kafka:", error);
+      logger.error("Failed to initialize Kafka:", error);
       this.isConnected = false;
       return false;
     }
@@ -92,7 +93,7 @@ class KafkaService {
     try {
       this.consumer = this.kafka.consumer({ groupId: this.config.groupId });
       await this.consumer.connect();
-      console.log(`Consumer connected to Kafka broker: ${this.config.broker}`);
+      logger.info(`Consumer connected to Kafka broker: ${this.config.broker}`);
       await this.consumer.subscribe({
         topic: this.config.qtoTopic,
         fromBeginning: false,
@@ -102,7 +103,7 @@ class KafkaService {
           try {
             const messageValue = message.value?.toString();
             if (messageValue) {
-              console.log(
+              logger.info(
                 `Received message from Kafka topic ${topic}:`,
                 messageValue.substring(0, 200) + "..."
               );
@@ -110,13 +111,13 @@ class KafkaService {
               await messageHandler(messageData);
             }
           } catch (err) {
-            console.error("Error processing Kafka message:", err);
+            logger.error("Error processing Kafka message:", err);
           }
         },
       });
       return true;
     } catch (error) {
-      console.error("Failed to create Kafka consumer:", error);
+      logger.error("Failed to create Kafka consumer:", error);
       return false;
     }
   }
@@ -131,11 +132,11 @@ class KafkaService {
   ): Promise<boolean> {
     try {
       if (!materialInstanceResults || materialInstanceResults.length === 0) {
-        console.log("[Kafka Send] No pre-calculated LCA instances to send.");
+        logger.info("[Kafka Send] No pre-calculated LCA instances to send.");
         return true; // Not an error if there's nothing to send
       }
       if (!kafkaMetadata) {
-        console.error("[Kafka Send] Incomplete metadata provided.");
+        logger.error("[Kafka Send] Incomplete metadata provided.");
         return false;
       }
 
@@ -155,7 +156,7 @@ class KafkaService {
         batches.push(materialInstanceResults.slice(i, i + BATCH_SIZE));
       }
 
-      console.log(
+      logger.info(
         `[Kafka Send] Sending ${materialInstanceResults.length} instances in ${batches.length} batches (Project: ${kafkaMetadata.project}, File: ${kafkaMetadata.filename})`
       );
 
@@ -170,7 +171,7 @@ class KafkaService {
         batch.forEach((instanceResult) => {
           const uniqueKey = `${instanceResult.id}::${instanceResult.sequence}`;
           if (sentKeys.has(uniqueKey)) {
-            console.warn(
+            logger.warn(
               `[Kafka Send] Skipping duplicate key for file ${kafkaMetadata.fileId}: id='${instanceResult.id}', sequence='${instanceResult.sequence}', KBOB Name='${instanceResult.kbob_name}'`
             );
             return; // Skip duplicate within this submission batch
@@ -192,7 +193,7 @@ class KafkaService {
         }); // End batch.forEach
 
         if (kafkaLcaData.length === 0) {
-          console.log(
+          logger.info(
             `[Kafka Send] Batch ${i + 1}/${
               batches.length
             } empty after filtering duplicates, skipping.`
@@ -214,7 +215,7 @@ class KafkaService {
           // console.log(`[Kafka Send] Sending Batch ${i + 1}/${batches.length}, Key: ${messageKey}, Size: ${kafkaLcaData.length}`); // Simplified log
           // Limit log size for potentially large messages
           const logPayload = JSON.stringify(lcaMessage);
-          console.log(
+          logger.info(
             `[Kafka Send] Sending Batch ${i + 1}/${
               batches.length
             } - Payload: ${logPayload.substring(0, 500)}${
@@ -228,7 +229,7 @@ class KafkaService {
           });
           // console.log(`[Kafka Send] Batch ${i + 1}/${batches.length} sent successfully.`); // Success log per batch can be verbose
         } catch (sendError) {
-          console.error(
+          logger.error(
             `[Kafka Send] Error sending batch ${i + 1}/${batches.length}:`,
             sendError
           );
@@ -245,17 +246,17 @@ class KafkaService {
       } // End batch loop
 
       if (allBatchesSentSuccessfully)
-        console.log(
+        logger.info(
           `[Kafka Send] All ${batches.length} batches sent successfully for fileId ${kafkaMetadata.fileId}.`
         );
       else
-        console.error(
+        logger.error(
           `[Kafka Send] Failed to send one or more batches for fileId ${kafkaMetadata.fileId}.`
         );
 
       return allBatchesSentSuccessfully;
     } catch (error) {
-      console.error(
+      logger.error(
         "[Kafka Send] Unexpected error in sendLcaBatchToKafka:",
         error
       );
@@ -272,7 +273,7 @@ class KafkaService {
     kafkaMetadata: KafkaMetadata,
     totals: { totalGwp: number; totalUbp: number; totalPenr: number }
   ): Promise<boolean> {
-    console.warn(
+    logger.warn(
       "Using deprecated method sendLcaBatchToKafkaLegacy - please update your code"
     );
     // Convert the old format to the new format for backward compatibility
@@ -311,19 +312,19 @@ class KafkaService {
         await this.admin.connect();
       }
       const topics = await this.admin.listTopics();
-      console.log(`Available Kafka topics: ${topics.join(", ")}`);
+      logger.info(`Available Kafka topics: ${topics.join(", ")}`);
       if (!topics.includes(topic)) {
-        console.log(`Topic '${topic}' does not exist. Creating it...`);
+        logger.info(`Topic '${topic}' does not exist. Creating it...`);
         await this.admin.createTopics({
           topics: [{ topic, numPartitions: 1, replicationFactor: 1 }],
         });
-        console.log(`Created topic: ${topic}`);
+        logger.info(`Created topic: ${topic}`);
       } else {
-        console.log(`Topic '${topic}' already exists`);
+        logger.info(`Topic '${topic}' already exists`);
       }
       return true;
     } catch (error) {
-      console.error(`Error checking/creating Kafka topic ${topic}:`, error);
+      logger.error(`Error checking/creating Kafka topic ${topic}:`, error);
       return false;
     }
   }
@@ -335,22 +336,22 @@ class KafkaService {
     try {
       if (this.consumer) {
         await this.consumer.disconnect();
-        console.log("Kafka consumer disconnected");
+        logger.info("Kafka consumer disconnected");
       }
       if (this.isProducerConnected) {
         await this.producer.disconnect();
-        console.log("Kafka producer disconnected");
+        logger.info("Kafka producer disconnected");
         this.isProducerConnected = false;
       }
       try {
         await this.admin.disconnect();
-        console.log("Kafka admin disconnected");
+        logger.info("Kafka admin disconnected");
       } catch (error) {
         /* Ignore */
       }
       this.isConnected = false;
     } catch (error) {
-      console.error("Error disconnecting from Kafka:", error);
+      logger.error("Error disconnecting from Kafka:", error);
     }
   }
 

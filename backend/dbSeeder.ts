@@ -1,6 +1,7 @@
 import { Db } from "mongodb";
-import fs from "fs";
-import path from "path";
+import { readFileSync, existsSync } from "fs";
+import { join } from "path";
+import logger from "./logger";
 // Import the shared config
 import { config } from "./config";
 
@@ -37,7 +38,7 @@ interface MaterialLibraryItem {
  */
 export async function seedKbobData(lcaDb: Db): Promise<void> {
   if (!lcaDb) {
-    console.error("LCA Database handle is not available for seeding.");
+    logger.error("LCA Database handle is not available for seeding.");
     return;
   }
   // Use collection name from imported config
@@ -48,23 +49,23 @@ export async function seedKbobData(lcaDb: Db): Promise<void> {
     const materialCount = await materialLibraryCollection.countDocuments();
 
     if (materialCount === 0) {
-      console.log(
+      logger.info(
         `'${config.mongodb.collections.materialLibrary}' collection is empty. Seeding from JSON file...`
       );
-      // Corrected path relative to dbSeeder.ts within socket-backend
-      const jsonFilePath = path.join(
+      // Corrected path relative to dbSeeder.ts within backend
+      const jsonFilePath = join(
         __dirname,
         "./data/indicatorsKBOB_v6.json"
       );
-      console.log(`Attempting to read KBOB data from: ${jsonFilePath}`);
+      logger.info(`Attempting to read KBOB data from: ${jsonFilePath}`);
 
-      if (!fs.existsSync(jsonFilePath)) {
+      if (!existsSync(jsonFilePath)) {
         throw new Error(`KBOB JSON file not found at ${jsonFilePath}.`);
       }
 
-      const jsonData = fs.readFileSync(jsonFilePath, "utf-8");
+      const jsonData = readFileSync(jsonFilePath, "utf-8");
       const kbobDataArray: RawKbobItem[] = JSON.parse(jsonData);
-      console.log(`Read ${kbobDataArray.length} items from JSON file.`);
+      logger.info(`Read ${kbobDataArray.length} items from JSON file.`);
 
       if (Array.isArray(kbobDataArray) && kbobDataArray.length > 0) {
         const transformedData: MaterialLibraryItem[] = kbobDataArray
@@ -106,7 +107,7 @@ export async function seedKbobData(lcaDb: Db): Promise<void> {
           })
           .filter((item): item is MaterialLibraryItem => item !== null);
 
-        console.log(
+        logger.info(
           `Transformed ${transformedData.length} valid items for seeding.`
         );
 
@@ -114,22 +115,22 @@ export async function seedKbobData(lcaDb: Db): Promise<void> {
           const insertResult = await materialLibraryCollection.insertMany(
             transformedData
           );
-          console.log(
+          logger.info(
             `Successfully seeded ${insertResult.insertedCount} KBOB materials into '${config.mongodb.collections.materialLibrary}'.`
           );
         } else {
-          console.log("No valid data transformed from JSON to seed.");
+          logger.info("No valid data transformed from JSON to seed.");
         }
       } else {
-        console.log("KBOB JSON file was empty or not an array.");
+        logger.info("KBOB JSON file was empty or not an array.");
       }
     } else {
-      console.log(
+      logger.info(
         `'${config.mongodb.collections.materialLibrary}' collection already contains ${materialCount} documents. Skipping seed.`
       );
     }
   } catch (seedError) {
-    console.error("Error during KBOB data seeding:", seedError);
+    logger.error("Error during KBOB data seeding:", seedError);
     // Log error and continue
   }
 }

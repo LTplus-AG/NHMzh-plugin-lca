@@ -13,6 +13,6 @@
     "resolveJsonModule": true,
     "isolatedModules": true
   },
-  "include": ["*.ts"],
+  "include": ["*.ts", "data/*.ts", "data/*.json"],
   "exclude": ["node_modules", "dist"]
 }

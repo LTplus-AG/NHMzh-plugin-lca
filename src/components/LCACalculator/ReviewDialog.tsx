@@ -31,6 +31,7 @@ import { DEFAULT_AMORTIZATION_YEARS } from "../../utils/constants";
 import { LCACalculator } from "../../utils/lcaCalculator";
 import { DisplayMode } from "../../utils/lcaDisplayHelper";
 import ElementImpactTable from "./ElementImpactTable";
+import logger from '../../utils/logger';
 
 interface ReviewDialogProps {
   open: boolean;
@@ -193,7 +194,7 @@ const ReviewDialog: React.FC<ReviewDialogProps> = ({
       // Maybe call onSubmit() here if it does something different than just closing?
       // onSubmit(); // <-- Uncomment if onSubmit has separate logic
     } catch (error) {
-      console.error("Error saving and submitting LCA data:", error);
+      logger.error("Error saving and submitting LCA data:", error);
       alert(
         "Fehler beim Speichern und Senden der Ökobilanz: " +
           (error instanceof Error ? error.message : String(error))
@@ -208,35 +209,30 @@ const ReviewDialog: React.FC<ReviewDialogProps> = ({
     (m) => matches[m.id]
   ).length;
 
-  // Use calculateGrandTotal for each indicator
-  // Note: calculateGrandTotal returns a formatted string. We might need raw numbers later.
-  const gwpFormatted = calculator.calculateGrandTotal(
-    modelledMaterials,
+  const gwpFormatted = calculator.calculateGrandTotalWithElements(
+    ifcElementsWithImpacts,
     matches,
     kbobMaterials,
     OutputFormats.GWP,
     materialDensities,
-    undefined,
     displayMode,
     ebfNumeric
   );
-  const ubpFormatted = calculator.calculateGrandTotal(
-    modelledMaterials,
+  const ubpFormatted = calculator.calculateGrandTotalWithElements(
+    ifcElementsWithImpacts,
     matches,
     kbobMaterials,
     OutputFormats.UBP,
     materialDensities,
-    undefined,
     displayMode,
     ebfNumeric
   );
-  const penrFormatted = calculator.calculateGrandTotal(
-    modelledMaterials,
+  const penrFormatted = calculator.calculateGrandTotalWithElements(
+    ifcElementsWithImpacts,
     matches,
     kbobMaterials,
     OutputFormats.PENR,
     materialDensities,
-    undefined,
     displayMode,
     ebfNumeric
   );

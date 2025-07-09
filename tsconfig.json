@@ -16,6 +16,6 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "socket-backend/data/ebkp-with-amortization-types.ts"],
+  "include": ["src", "backend/data/ebkp-with-amortization-types.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

@@ -44,8 +44,10 @@ export interface Material {
   id: string;
   name: string;
   volume: number;
-  ebkp?: string;
+  unit?: string;
   density?: number;
+  kbobMaterialId?: string;
+  [key: string]: string | number | boolean | null | undefined;
 }
 
 export interface MaterialCSVImport {
@@ -94,6 +96,18 @@ export interface MaterialImpact {
   penr: number;
 }
 
+export interface ElementImpact extends MaterialImpact {
+  amortizationYears?: number;
+}
+
+export interface ProjectMetadata {
+  filename?: string;
+  upload_timestamp?: string;
+  file_id?: string;
+  model?: string;
+  [key: string]: string | number | boolean | null | undefined;
+}
+
 export interface NewMaterial {
   kbobId: string;
   name: string;
@@ -122,61 +136,50 @@ export const EBKPCodes = {
 
 export type EBKPCode = keyof typeof EBKPCodes;
 
-// Change ModelledMaterials to be an empty array by default
 export const ModelledMaterials: Material[] = [];
 
 export const UnmodelledMaterials: UnmodelledMaterial[] = [];
 
-// Add to your existing types
 export interface FormData {
-  // ... existing fields
   ebkp: string;
-  // ... other fields
 }
 
-// Add ebf property to ProjectData interface
 export interface ProjectData {
   projectId: string;
   name: string;
-  ifcData: {
-    materials?: { name: string; volume: number }[];
-    elements?: any[];
-    totalImpact?: {
-      gwp: number;
-      ubp: number;
-      penr: number;
-    };
+  metadata?: ProjectMetadata;
+  ifcData?: {
+    materials: Material[];
+    elements?: LcaElement[];
   };
-  materialMappings: Record<string, string>;
-  ebf?: number | null; // Add this property
+  materialMappings?: Record<string, string>;
+  materialDensities?: Record<string, number>;
+  ebf?: number;
 }
 
 // Define LcaElement centrally
 export interface LcaElement {
+  _id?: string;
   id: string;
-  element_type: string;
+  guid: string;
+  name: string;
+  ifc_class: string;
+  element_type?: string;
   type_name?: string;
-  quantity: number; // Represents total volume for the element
-  properties: {
-    level?: string;
-    is_structural?: boolean;
-    is_external?: boolean;
+  quantity?: number;
+  ebkp?: string;
+  materials: Material[];
+  impact?: ElementImpact;
+  impacts?: ElementImpact;
+  properties?: {
     ebkp_code?: string;
     ebkp_name?: string;
-    [key: string]: any; // Allow other potential properties
+    [key: string]: string | number | boolean | null | undefined;
   };
-  materials: {
-    id: string; // Ensure material has an ID
-    name: string;
-    volume: number;
-    unit: string;
-    kbob_id?: string; // Optional KBOB mapping ID at material instance level
-  }[];
-  impact?: MaterialImpact; // Use existing MaterialImpact type
-  amortization_years?: number; // Dynamic lifetime based on EBKP
+  amortization_years?: number;
+  [key: string]: string | number | boolean | null | undefined | Material[] | ElementImpact | { [key: string]: any };
 }
 
-// Hierarchical EBKP types for LCA
 export interface LcaEbkpGroup {
   code: string;
   name: string;
@@ -193,4 +196,10 @@ export interface HierarchicalLcaEbkpGroup {
   totalElements: number;
   totalQuantity: number;
   totalImpact: MaterialImpact;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  ebf?: number | null;
 }

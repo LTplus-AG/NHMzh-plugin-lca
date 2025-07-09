@@ -1,14 +1,16 @@
-import React from "react";
+import React from 'react';
+import { AppBar, Toolbar, Typography } from '@mui/material';
 
-interface HeaderProps {
-  title?: string;
-}
-
-// This component is intentionally empty to avoid conflicts with microfrontend headers
-// We maintain the paddingTop in the App component to ensure correct layout spacing
-const Header: React.FC<HeaderProps> = ({ title = "NHM Ökobilanz" }) => {
-  // Return null to hide our header, relying on the microfrontend's header instead
-  return null;
+const Header: React.FC = () => {
+  return (
+    <AppBar position="static" sx={{ backgroundColor: '#1976d2' }}>
+      <Toolbar>
+        <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+          LCA Plugin
+        </Typography>
+      </Toolbar>
+    </AppBar>
+  );
 };
 
-export default Header;
+export default Header; 

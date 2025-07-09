@@ -11,7 +11,7 @@ if (MONGODB_URI && !MONGODB_URI.includes("authSource=")) {
 }
 
 export const config = {
-  websocket: { port: parseInt(process.env.WEBSOCKET_PORT || "8002") },
+  http: { port: parseInt(process.env.HTTP_PORT || "8002") },
   mongodb: {
     uri:
       process.env.MONGODB_URI ||

@@ -1,240 +1,122 @@
-# 🌱 NHMzh Plugin LCA (Life Cycle Assessment)
+# 🌱 NHMzh Plugin-LCA: Ökobilanzierung (Life Cycle Assessment)
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg?style=for-the-badge)](https://www.gnu.org/licenses/agpl-3.0)
-[![Vite](https://img.shields.io/badge/Vite-5.4-646CFF.svg?style=for-the-badge&logo=vite)](https://vitejs.dev/)
 [![React](https://img.shields.io/badge/React-18.3-61DAFB.svg?style=for-the-badge&logo=react)](https://reactjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6.svg?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-3.4-38B2AC.svg?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
-[![Version](https://img.shields.io/badge/Version-0.0.1-brightgreen.svg?style=for-the-badge)](https://github.com/LTplus-AG/NHMzh-plugin-lca)
+[![Vite](https://img.shields.io/badge/Vite-5.4-646CFF.svg?style=for-the-badge&logo=vite)](https://vitejs.dev/)
 
-Web interface for the Life Cycle Assessment (LCA) module of the Sustainability Monitoring System for the City of Zurich (Nachhaltigkeitsmonitoring der Stadt Zürich).
+Modul zur Ökobilanzierung (LCA) im Nachhaltigkeitsmonitoring der Stadt Zürich (NHMzh).
 
-## 📋 Table of Contents
+## 📋 Inhaltsverzeichnis
 
-- [Features](#-features)
-- [Context](#-context)
+- [Architektur und Kontext](#-architektur-und-kontext)
+- [Funktionsumfang](#-funktionsumfang)
+- [Datenbank-Schema](#-datenbank-schema)
+- [Kommunikation](#-kommunikation)
 - [Installation](#-installation)
-- [Kafka Topics](#-kafka-topics)
-- [Data Models](#-data-models)
-- [Project Structure](#-project-structure)
-- [Environment Variables](#-environment-variables)
-- [Tech Stack](#-tech-stack)
-- [API Integration](#-api-integration)
-- [Integration](#-integration)
-- [License](#-license)
+- [Umgebungsvariablen](#-umgebungsvariablen)
+- [Lizenz](#-lizenz)
 
-## ✨ Features
+---
 
-- Material management and LCA calculations
-- KBOB material database integration via [lcadata.ch](https://www.lcadata.ch/)
-- Comprehensive material database with environmental impact data
-- Interactive visualization of LCA results
-- Integration with BIM workflows through NHMzh ecosystem
+### 🏛️ Architektur und Kontext
 
-## 🔍 Context
+Dieses Plugin ist die Weboberfläche für das LCA-Modul und ist Teil des NHMzh-Ökosystems. Die Architektur basiert auf einem dedizierten Backend, das für die Berechnungen zuständig ist.
 
-This UI works in conjunction with the NHMzh ecosystem, particularly integrating with:
+- **Frontend**: Eine in React und TypeScript entwickelte Single-Page-Application (SPA) zur Visualisierung von LCA-Daten und zur Interaktion mit dem Benutzer.
+- **Backend**: Ein in `backend/` enthaltener Node.js/Express-Server, der als API für das Frontend dient.
+- **Datenfluss**:
+    1. Das **LCA-Backend** fragt die `elements`-Sammlung aus der **MongoDB-Datenbank des QTO-Plugins** ab, um Material- und Mengendaten zu erhalten.
+    2. Es berechnet die Umweltauswirkungen (GWP, UBP, PENR) basierend auf Materialvolumen und KBOB-Ökokennwerten.
+    3. Die Ergebnisse werden in der eigenen `lca`-MongoDB-Datenbank gespeichert.
+    4. Das **LCA-Frontend** ruft die berechneten Daten über eine **REST-API** vom LCA-Backend ab und stellt sie dar.
 
-- **QTO Plugin**: Gathers material quantities and element data
-- **Cost Plugin**: Uses cost data for economic impact assessment
-- **Central Database**: Stores and retrieves environmental impact data
+Die Kommunikation zwischen Frontend und Backend erfolgt zustandslos über HTTP-Anfragen. 
 
-## 🚀 Installation
+### ✨ Funktionsumfang
 
-First, start the development server:
+- **Material-Mapping**: Zuordnung von IFC-Materialien zu KBOB-Materialdaten.
+- **LCA-Berechnungen**: Automatische Berechnung von GWP, UBP und PENR.
+- **Amortisationslogik**: EBKP-basierte Zuweisung von Amortisationsdauern für Bauteile.
+- **KBOB-Integration**: Anbindung an die KBOB-Datenbank zur Nutzung von Ökokennwerten.
+- **Interaktive Visualisierung**: Grafische Aufbereitung der LCA-Ergebnisse.
+- **Projektverwaltung**: Auswahl und Bearbeitung von verschiedenen Projekten.
+
+### 💾 Datenbank-Schema
+
+Das LCA-Plugin speichert seine Ergebnisse in einer `lca`-MongoDB-Datenbank. Die zentrale Sammlung ist `materialInstances`.
+
+**`lca.materialInstances`**
+```json
+{
+  "_id": "ObjectId",
+  "element_id": "ObjectId", // Referenz zu qto.elements
+  "material_name": "Beton C30/37",
+  "volume": 45.2,
+  "density": 2400,
+  "mass": 108480,
+  "environmental_impact": {
+    "GWP_absolute": 32544.0,
+    "UBP_absolute": 1084800,
+    "PENR_absolute": 54240.0,
+    "GWP_relative": 10.85,
+    "UBP_relative": 361.6,
+    "PENR_relative": 18.08
+  },
+  "amortization_period": 60,
+  "ebkp_code": "C2.01",
+  "project_id": "project_001",
+  "calculated_at": "ISODate"
+}
+```
+*   `GWP_relative`: kg CO₂-eq/(m²·a)
+*   `UBP_relative`: UBP/(m²·a)
+*   `PENR_relative`: kWh/(m²·a)
+
+### 📞 Kommunikation
+
+#### Interne Kommunikation (Frontend ↔ Backend)
+Die Kommunikation zwischen dem React-Frontend und dem Node.js-Backend erfolgt über eine **REST-API**. Das Frontend sendet HTTP-Anfragen an das Backend, um Projektdaten abzurufen oder Materialzuordnungen zu speichern.
+
+#### Externe Kommunikation (Backend → Externe Systeme)
+Das Backend kann **zusammengefasste Endergebnisse** an **Kafka** publizieren. Dies dient der Anbindung von externen Systemen wie Dashboards. Die direkte Kommunikation zwischen den Modulen (QTO, Cost, LCA) findet über die gemeinsame MongoDB-Instanz statt, nicht über Kafka.
+
+---
+
+### 🚀 Installation
+
+Server für die Entwicklungsumgebung starten:
 
 ```bash
-# Clone the repository
+# Repository klonen
 git clone https://github.com/LTplus-AG/NHMzh-plugin-lca.git
 cd NHMzh-plugin-lca
 
-# Install dependencies
+# Frontend-Abhängigkeiten installieren
 npm install
 
-# Start the development server
+# Backend-Abhängigkeiten installieren
+cd backend
+npm install
+cd ..
+
+# Frontend-Entwicklungsserver starten
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser to see the result.
+Die Anwendung ist unter [http://localhost:5173](http://localhost:5173) erreichbar. Das Backend muss separat gestartet werden.
 
-## 📡 Kafka Topics
+### 🔧 Umgebungsvariablen
 
-The LCA plugin interfaces with Kafka as follows:
-
-- **Consumes from**: QTO elements topic (default: "qto-elements") to receive building element data
-- **Publishes to**: LCA data topic (default: "lca-data") 
-
-When sending LCA calculation results downstream, the plugin publishes batched material instances with:
-
-```json
-{
-  "project": "Project Name",
-  "filename": "original.ifc",
-  "timestamp": "2023-01-01T12:00:00Z",
-  "fileId": "unique-file-identifier",
-  "data": [
-    {
-      "id": "element-global-id",
-      "sequence": 0,
-      "mat_kbob": "Material Name",
-      "gwp_relative": 0.15,
-      "gwp_absolute": 25.5,
-      "penr_relative": 0.12,
-      "penr_absolute": 150.3,
-      "ubp_relative": 0.18,
-      "ubp_absolute": 1250.4
-    }
-    // Additional materials...
-  ]
-}
-```
-
-The environmental impact values include:
-- **GWP**: Global Warming Potential (CO₂ equivalent)
-- **PENR**: Primary Energy Non-Renewable
-- **UBP**: Environmental Impact Points (Umweltbelastungspunkte)
-
-## 💾 Data Models
-
-The LCA plugin uses MongoDB to store environmental impact data. The primary data models include:
-
-### LCA Impact Model
-
-```typescript
-{
-  gwp: number,     // Global Warming Potential (kg CO2-eq)
-  ubp: number,     // Environmental Impact Points (UBP points)
-  penr: number     // Primary Energy Non-Renewable (kWh)
-}
-```
-
-### LCA Element Data
-
-```typescript
-{
-  id: string,               // Element identifier from IFC
-  category: string,         // Element category (e.g., "IfcWall")
-  level: string,            // Building level/story
-  is_structural: boolean,   // Whether element is structural
-  materials: [              // Array of materials
-    {
-      name: string,         // Material name
-      volume: number,       // Material volume (m³)
-      impact?: {            // Environmental impact
-        gwp: number,
-        ubp: number,
-        penr: number
-      }
-    }
-  ],
-  impact: {                 // Total element impact
-    gwp: number,
-    ubp: number,
-    penr: number
-  },
-  sequence?: number,        // Sequence number
-  primaryKbobId?: string    // Reference to KBOB database
-}
-```
-
-### KBOB Material Data
-
-Stored in the materialLibrary collection, containing environmental impact coefficients for different materials:
-
-```typescript
-{
-  id: string,               // KBOB material identifier
-  nameDE: string,           // German name
-  nameEN: string,           // English name
-  category: string,         // Material category
-  subcategory: string,      // Material subcategory
-  density: number,          // Material density (kg/m³)
-  gwp: number,              // Global Warming Potential per kg
-  ubp: number,              // Environmental Impact Points per kg
-  penr: number,             // Primary Energy Non-Renewable per kg
-  metadata: {               // Additional information
-    source: string,
-    date: Date,
-    version: string
-  }
-}
-```
-
-### LCA Results
-
-Stored results of LCA calculations for projects:
-
-```typescript
-{
-  projectId: string,         // Project identifier
-  ifcData: {                 // Original IFC data information
-    materials: [],           // Material list
-    totalImpact: {           // Aggregated impact values
-      gwp: number,
-      ubp: number,
-      penr: number
-    }
-  },
-  materialMappings: {        // Maps IFC materials to KBOB
-    [materialName: string]: string  // KBOB ID
-  },
-  ebf: number,               // Energy reference area (m²)
-  lastUpdated: Date          // Last calculation timestamp
-}
-```
-
-## 🗂️ Project Structure
+Für die Konfiguration des Frontends wird eine `.env`-Datei im Stammverzeichnis verwendet:
 
 ```
-app/
-├── components/
-│   └── ui/
-├── data/
-├── lib/
-├── services/
-├── types/
-└── utils/
+# URL des LCA-Backends
+VITE_API_URL=http://localhost:8002
 ```
 
-## 🔧 Environment Variables
+Das Backend verwendet ebenfalls Umgebungsvariablen zur Konfiguration der Datenbankverbindung und anderer Dienste.
 
-Create a `.env.local` file in the root directory with:
+### 📄 Lizenz
 
-```
-IFC_API_KEY=your_api_key
-```
-
-The API key can be obtained from [lcadata.ch](https://www.lcadata.ch/).
-
-## 🛠️ Tech Stack
-
-- **React 18** - UI library
-- **Tailwind CSS** - Styling framework
-- **TypeScript** - Type-safe JavaScript
-- **Radix UI** - Accessible component primitives
-- **Vite** - Build tool and development environment
-
-## 🔌 API Integration
-
-The application integrates with:
-
-- **KBOB Material Database API** via [lcadata.ch](https://www.lcadata.ch/) for environmental impact data:
-  - Extensive database of building materials
-  - Environmental impact data from KBOB
-  - Manufacturer-specific data
-
-## 🔗 Integration
-
-The LCA plugin integrates with other NHMzh modules:
-
-- **QTO Plugin**: Receives material quantities from IFC models (see [NHMzh-plugin-qto](https://github.com/LTplus-AG/NHMzh-plugin-qto))
-- **Cost Plugin**: Uses cost data for economic-ecological comparisons (see [NHMzh-plugin-cost](https://github.com/LTplus-AG/NHMzh-plugin-cost))
-- **Central Database**: Stores assessment results for reporting
-
-## 📄 License
-
-This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
-
-GNU Affero General Public License v3.0 (AGPL-3.0): This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
-
-See <https://www.gnu.org/licenses/agpl-3.0.html> for details.
+Dieses Projekt ist unter der GNU Affero General Public License v3.0 (AGPL-3.0) lizenziert. Details finden Sie in der [Lizenzdatei](https://www.gnu.org/licenses/agpl-3.0.html).
