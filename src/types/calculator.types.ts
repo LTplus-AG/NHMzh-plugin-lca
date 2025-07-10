@@ -36,7 +36,7 @@ export interface ProjectOption {
   label: string;
 }
 
-export interface ProjectMetadata {
+export interface CalculatorProjectMetadata {
   filename: string;
   upload_timestamp: string;
   element_count?: number;

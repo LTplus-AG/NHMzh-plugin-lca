@@ -19,7 +19,22 @@ class Logger {
   private enableTimestamp: boolean;
 
   constructor(config: LoggerConfig = {}) {
-    this.level = (config.level || process.env.LOG_LEVEL || 'info') as LogLevel;
+    // Validate LOG_LEVEL from environment
+    const envLogLevel = process.env.LOG_LEVEL?.toLowerCase();
+    const validLogLevels: LogLevel[] = ['debug', 'info', 'warn', 'error'];
+    const isValidLogLevel = (level: string | undefined): level is LogLevel => {
+      return level !== undefined && validLogLevels.includes(level as LogLevel);
+    };
+    
+    // Use validated log level or fall back to defaults
+    if (config.level && isValidLogLevel(config.level)) {
+      this.level = config.level;
+    } else if (isValidLogLevel(envLogLevel)) {
+      this.level = envLogLevel;
+    } else {
+      this.level = 'info'; // Default fallback
+    }
+    
     this.prefix = config.prefix || '[LCA-Backend]';
     this.enableTimestamp = config.enableTimestamp !== false;
   }
@@ -58,9 +73,9 @@ class Logger {
     }
   }
 
-  error(message: string, error?: any): void {
+  error(message: string, data?: any): void {
     if (this.shouldLog('error')) {
-      console.error(this.formatMessage('error', message), error || '');
+      console.error(this.formatMessage('error', message), data || '');
     }
   }
 

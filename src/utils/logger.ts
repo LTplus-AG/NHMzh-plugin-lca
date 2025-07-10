@@ -18,9 +18,24 @@ class Logger {
   };
 
   constructor(config: LoggerConfig = { level: 'info' }) {
-    this.level = config.level;
-    this.prefix = config.prefix || '[LCA]';
-    this.enableTimestamp = config.enableTimestamp ?? true;
+    // Validate and sanitize log level
+    const validLogLevels: LogLevel[] = ['debug', 'info', 'warn', 'error'];
+    if (validLogLevels.includes(config.level)) {
+      this.level = config.level;
+    } else {
+      console.warn(`Invalid log level "${config.level}", defaulting to "info"`);
+      this.level = 'info';
+    }
+    
+    // Validate and sanitize prefix
+    this.prefix = typeof config.prefix === 'string' && config.prefix.trim() 
+      ? config.prefix.trim() 
+      : '[LCA]';
+    
+    // Validate enableTimestamp
+    this.enableTimestamp = typeof config.enableTimestamp === 'boolean' 
+      ? config.enableTimestamp 
+      : true;
   }
 
   private shouldLog(level: LogLevel): boolean {
@@ -68,10 +83,23 @@ class Logger {
   }
 }
 
-// Create singleton instance
+// Helper function to validate log level from environment
+const getValidatedLogLevel = (): LogLevel => {
+  const envLevel = import.meta.env.VITE_LOG_LEVEL?.toLowerCase();
+  const validLevels: LogLevel[] = ['debug', 'info', 'warn', 'error'];
+  
+  if (envLevel && validLevels.includes(envLevel as LogLevel)) {
+    return envLevel as LogLevel;
+  }
+  
+  return 'info'; // Default fallback
+};
+
+// Create singleton instance with validated config
 const logger = new Logger({
-  level: import.meta.env.VITE_LOG_LEVEL as LogLevel || 'info',
-  prefix: '[LCA]'
+  level: getValidatedLogLevel(),
+  prefix: '[LCA]',
+  enableTimestamp: true
 });
 
 export default logger;

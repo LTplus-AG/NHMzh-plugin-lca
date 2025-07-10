@@ -3,8 +3,8 @@ import { Box, Tooltip, Typography, CircularProgress } from "@mui/material";
 import logger from '../../utils/logger';
 
 interface ProjectMetadata {
-  filename: string;
-  upload_timestamp: string;
+  filename?: string;
+  upload_timestamp?: string;
   element_count?: number;
 }
 

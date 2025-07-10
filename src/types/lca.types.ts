@@ -160,7 +160,6 @@ export interface ProjectData {
 // Define LcaElement centrally
 export interface LcaElement {
   _id?: string;
-  id: string;
   guid: string;
   name: string;
   ifc_class: string;
@@ -170,14 +169,19 @@ export interface LcaElement {
   ebkp?: string;
   materials: Material[];
   impact?: ElementImpact;
-  impacts?: ElementImpact;
   properties?: {
     ebkp_code?: string;
     ebkp_name?: string;
-    [key: string]: string | number | boolean | null | undefined;
+    level?: string;
+    is_structural?: boolean;
+    is_external?: boolean;
+    area?: number;
+    length?: number;
+    volume?: number;
   };
   amortization_years?: number;
-  [key: string]: string | number | boolean | null | undefined | Material[] | ElementImpact | { [key: string]: any };
+  updated_at?: string;
+  created_at?: string;
 }
 
 export interface LcaEbkpGroup {

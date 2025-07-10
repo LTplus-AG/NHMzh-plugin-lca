@@ -41,9 +41,9 @@ import {
   IFCResult,
   MaterialOption,
   MaterialOptionGroup,
-  ProjectMetadata,
   ProjectOption
 } from "../types/calculator.types";
+import { ProjectMetadata } from "../types/lca.types";
 import { getAmortizationYears } from "../utils/amortizationUtils";
 import { DEFAULT_AMORTIZATION_YEARS } from "../utils/constants";
 import { LCAImpactCalculator } from "../utils/lcaImpactCalculator";
@@ -175,8 +175,7 @@ export default function LCACalculatorComponent(): JSX.Element {
 
       // Initialize impact as undefined, it will be calculated later
       return {
-        id: element.global_id || element.id || `elem-${index}`,
-        guid: element.global_id || element.guid || element.id || `elem-${index}`,
+        guid: element.global_id || element.id || `elem-${index}`,
         name: element.name || element.type_name || "Unknown Element",
         ifc_class: element.element_type || element.ifc_class || "Unknown",
         element_type: element.element_type || element.ifc_class || "Unknown Element",
@@ -724,7 +723,7 @@ export default function LCACalculatorComponent(): JSX.Element {
             ebfNumeric && amortization > 0 ? ebfNumeric * amortization : null;
 
           return {
-            id: el.id, // Use element ID directly
+            id: el.guid, // Use element GUID
             sequence: matIndex, // Add sequence number for each material
             mat_kbob: kbobMat?.nameDE || "UNKNOWN", // Ensure mat_kbob is always present
             kbob_name: kbobMat?.nameDE || "UNKNOWN", // Add kbob_name field
