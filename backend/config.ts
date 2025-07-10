@@ -3,11 +3,18 @@ import dotenv from "dotenv";
 dotenv.config();
 
 // Ensure authSource=admin is used for MongoDB authentication
-let MONGODB_URI = process.env.MONGODB_URI as string;
-if (MONGODB_URI && !MONGODB_URI.includes("authSource=")) {
-  MONGODB_URI += "?authSource=admin";
-} else if (MONGODB_URI && MONGODB_URI.includes("authSource=cost")) {
-  MONGODB_URI = MONGODB_URI.replace("authSource=cost", "authSource=admin");
+let MONGODB_URI = process.env.MONGODB_URI;
+if (MONGODB_URI) {
+  try {
+    const url = new URL(MONGODB_URI);
+    if (!url.searchParams.has('authSource') || url.searchParams.get('authSource') === 'cost') {
+      url.searchParams.set('authSource', 'admin');
+    }
+    MONGODB_URI = url.toString();
+  } catch (error) {
+    console.error('Invalid MongoDB URI format:', error);
+    throw new Error('Invalid MongoDB URI format');
+  }
 }
 
 export const config = {

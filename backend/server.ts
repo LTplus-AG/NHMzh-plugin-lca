@@ -12,6 +12,8 @@ import { seedKbobData } from "./dbSeeder";
 import { config } from "./config";
 import { QtoElement as QtoElementType } from "./types";
 import logger from "./logger";
+import { Request, Response } from "express";
+import { Kafka, Producer } from "kafkajs";
 
 let lcaDbInstance: Db | null = null;
 let qtoDbInstance: Db | null = null;
@@ -198,6 +200,8 @@ app.post("/api/projects/:projectId/confirm-lca",
   }
 );
 
+
+
 // --- 404 Handler ---
 app.use((req, res) => {
   res.status(404).json({ error: "Route not found" });
@@ -222,29 +226,70 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 const server = createServer(app);
 
-async function connectToDatabases() {
-  const client = new MongoClient(config.mongodb.uri);
-  await client.connect();
-  lcaDbInstance = client.db(config.mongodb.database);
-  qtoDbInstance = client.db(config.mongodb.qtoDatabase);
-  mongoClientInstance = client;
-  await seedKbobData(lcaDbInstance);
+async function connectToDatabases(maxRetries = 3, retryDelay = 5000) {
+  let retries = 0;
+  
+  while (retries < maxRetries) {
+    try {
+      logger.info(`Attempting to connect to MongoDB (attempt ${retries + 1}/${maxRetries})...`);
+      const client = new MongoClient(config.mongodb.uri);
+      await client.connect();
+      lcaDbInstance = client.db(config.mongodb.database);
+      qtoDbInstance = client.db(config.mongodb.qtoDatabase);
+      mongoClientInstance = client;
+      await seedKbobData(lcaDbInstance);
+      logger.info("MongoDB connected successfully for LCA service.");
+      return; // Success, exit the function
+    } catch (error) {
+      retries++;
+      logger.error(`MongoDB connection failed (attempt ${retries}/${maxRetries}):`, error);
+      
+      if (retries >= maxRetries) {
+        throw new Error(`Failed to connect to MongoDB after ${maxRetries} attempts`);
+      }
+      
+      logger.info(`Retrying in ${retryDelay / 1000} seconds...`);
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
+    }
+  }
+}
+
+async function initializeKafka(maxRetries = 3, retryDelay = 5000) {
+  let retries = 0;
+  
+  while (retries < maxRetries) {
+    try {
+      logger.info(`Attempting to initialize Kafka (attempt ${retries + 1}/${maxRetries})...`);
+      await kafkaService.initialize();
+      logger.info("Kafka service initialized successfully.");
+      return; // Success, exit the function
+    } catch (error) {
+      retries++;
+      logger.error(`Kafka initialization failed (attempt ${retries}/${maxRetries}):`, error);
+      
+      if (retries >= maxRetries) {
+        throw new Error(`Failed to initialize Kafka after ${maxRetries} attempts`);
+      }
+      
+      logger.info(`Retrying in ${retryDelay / 1000} seconds...`);
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
+    }
+  }
 }
 
 async function startServer() {
   try {
-    // Connect to MongoDB
+    // Connect to MongoDB with retries
     await connectToDatabases();
-    logger.info("MongoDB connected for LCA service.");
 
-    // Initialize Kafka
-    await kafkaService.initialize();
-    logger.info("Kafka service initialized.");
+    // Initialize Kafka with retries
+    await initializeKafka();
 
     // Start HTTP server
     app.listen(config.http.port, () => {
       logger.info(`LCA HTTP server listening on port ${config.http.port}`);
     });
+
   } catch (error) {
     logger.error("Failed to start LCA server:", error);
     process.exit(1);
