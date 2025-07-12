@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-totals.py – quick-and-dirty helper to sum the environmental indicators
+totals.py - quick-and-dirty helper to sum the environmental indicators
 in the export you pasted into ChatGPT.
 
 USAGE
@@ -107,7 +107,7 @@ def main() -> None:
                 "count": id_sequence_counts[key]
             })
 
-    # 2 – grand totals --------------------------------------------------------
+    # 2 - grand totals --------------------------------------------------------
     grand = defaultdict(float)
     for row in all_rows:
         for m in METRICS:
@@ -117,7 +117,7 @@ def main() -> None:
     for m in METRICS:
         print(f"{m:15}: {grand[m]:,.6f}")
 
-    # 3 – per-material breakdown (optional) -----------------------------------
+    # 3 - per-material breakdown (optional) -----------------------------------
     per_material = defaultdict(lambda: defaultdict(float))
     for row in all_rows:
         mat = row.get("mat_kbob", "UNKNOWN")
@@ -130,7 +130,7 @@ def main() -> None:
         for m in METRICS:
             print(f"  {m:13}: {metrics[m]:,.6f}")
 
-    # 4 – duplicate id/sequence combinations ----------------------------------
+    # 4 - duplicate id/sequence combinations ----------------------------------
     if duplicate_combinations:
         print("\n=== DUPLICATE ID/SEQUENCE COMBINATIONS ===")
         # Group by the combination and show unique entries
