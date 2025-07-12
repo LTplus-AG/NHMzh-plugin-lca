@@ -2,7 +2,7 @@
 id: lca-plugin-guide
 slug: /lca-plugin-guide
 title: Using the LCA Plugin
-sidebar_label: Getting Started
+sidebar_label: Plugin Guide
 ---
 
 > **Audience:** Sustainability analysts, project managers, and anyone who needs to review the environmental impact numbers in NHMzh. No engineering or coding background required.

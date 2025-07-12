@@ -25,6 +25,8 @@ dist-ssr
 
 .vercel
 
+# Documentation testing environment
+docs-test/
 
 kbob_materials.db
 kbob_materials.db.wal
