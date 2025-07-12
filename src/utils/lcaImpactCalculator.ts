@@ -37,8 +37,6 @@ export class LCAImpactCalculator {
     }
     // Final validation of density
     if (typeof density !== "number" || density <= 0) {
-      // Optionally log a warning
-      // console.warn(`Invalid or zero density (${density}) for material ${material.id} / KBOB ${kbobMaterial.id}. Returning zero impact.`);
       return { gwp: 0, ubp: 0, penr: 0 };
     }
 
@@ -52,8 +50,6 @@ export class LCAImpactCalculator {
     // --- Safely calculate and validate mass ---
     const mass = volume * density;
     if (isNaN(mass) || mass < 0) {
-      // Optionally log a warning
-      // console.warn(`Invalid mass (${mass}) calculated for material ${material.id} / KBOB ${kbobMaterial.id}. Returning zero impact.`);
       return { gwp: 0, ubp: 0, penr: 0 };
     }
     // No need to check if mass is zero, as impacts would be zero anyway

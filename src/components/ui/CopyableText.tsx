@@ -8,6 +8,7 @@ import {
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import CheckIcon from "@mui/icons-material/Check";
+import logger from '../../utils/logger';
 
 interface CopyableTextProps {
   text: string;
@@ -24,25 +25,24 @@ const CopyableText: React.FC<CopyableTextProps> = ({
   displayText,
   maxWidth = "110px",
   fontSize = "0.75rem",
-  tooltip = "GUID kopieren",
+  tooltip = "Global ID kopieren",
   variant = 'chip',
   showFullText = false,
 }) => {
   const [copied, setCopied] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
-  const handleCopy = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 1000);
     } catch (err) {
-      console.error("Failed to copy text: ", err);
+      logger.error("Failed to copy text: ", err);
     }
   };
 
-  // Smart truncation for GUIDs
+  // Smart truncation for Global IDs
   const getDisplayText = () => {
     if (displayText) return displayText;
     if (showFullText) return text;

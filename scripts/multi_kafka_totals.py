@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-multi_kafka_totals.py – Processes multiple Kafka export files and calculates totals
+multi_kafka_totals.py - Processes multiple Kafka export files and calculates totals
 
 USAGE
     python multi_kafka_totals.py <directory_path> <file_pattern>

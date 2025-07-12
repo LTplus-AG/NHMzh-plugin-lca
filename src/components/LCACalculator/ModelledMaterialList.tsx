@@ -18,26 +18,10 @@ import {
 } from "@mui/material";
 import { useTheme, alpha } from "@mui/material/styles";
 import Select from "react-select";
-import {
-  Material,
-  KbobMaterial,
-  OutputFormats,
-  MaterialImpact,
-} from "../../types/lca.types";
+import { KbobMaterial, Material, MaterialImpact, OutputFormats } from "../../types/lca.types";
+import { MaterialOption, MaterialOptionGroup } from "../../types/calculator.types";
 
-export interface MaterialOption {
-  value: string;
-  label: string;
-  isDisabled?: boolean;
-  className?: string;
-}
-
-export interface MaterialOptionGroup {
-  label: string;
-  options: MaterialOption[];
-}
-
-export interface ModelledMaterialListProps {
+interface ModelledMaterialListProps {
   modelledMaterials: Material[];
   kbobMaterials: KbobMaterial[];
   matches: Record<string, string>;

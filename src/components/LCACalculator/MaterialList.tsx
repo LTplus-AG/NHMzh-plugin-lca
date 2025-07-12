@@ -8,36 +8,21 @@ import {
   Tooltip,
   Chip,
 } from "@mui/material";
-import { UnmodelledMaterial, KbobMaterial } from "../../types/lca.types";
+import { KbobMaterial, Material } from "../../types/lca.types";
 import { ebkpData } from "../../data/ebkpData";
-import { SingleValue } from "react-select";
-
-interface MaterialOption {
-  value: string;
-  label: string;
-}
 
 interface MaterialListProps {
-  unmodelledMaterials: UnmodelledMaterial[];
+  unmodelledMaterials: Material[];
   kbobMaterials: KbobMaterial[];
-  handleMaterialSelect: (
-    selectedOption: SingleValue<MaterialOption>,
-    materialId: string
-  ) => void;
   handleRemoveUnmodelledMaterial: (index: number) => void;
-  handleEditMaterial: (material: UnmodelledMaterial) => void;
-  kbobMaterialOptions: any;
-  selectStyles: any;
+  handleEditMaterial: (material: Material) => void;
 }
 
 const MaterialList: React.FC<MaterialListProps> = ({
   unmodelledMaterials,
   kbobMaterials,
-  handleMaterialSelect,
   handleRemoveUnmodelledMaterial,
   handleEditMaterial,
-  kbobMaterialOptions,
-  selectStyles,
 }) => {
   return (
     <Grid container spacing={{ xs: 1, sm: 2 }}>

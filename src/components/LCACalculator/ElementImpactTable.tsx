@@ -179,7 +179,7 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(100);
   const [groupBy, setGroupBy] = useState<GroupingMode>("ebkp");
-  
+
   // Hierarchical table state for EBKP grouping
   const [expandedMainGroups, setExpandedMainGroups] = useState<string[]>([]);
   const [expandedEbkp, setExpandedEbkp] = useState<string[]>([]);
@@ -193,16 +193,16 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
 
   // Expand/collapse functionality
   const toggleMainGroup = (mainGroup: string) => {
-    setExpandedMainGroups(prev => 
-      prev.includes(mainGroup) 
+    setExpandedMainGroups(prev =>
+      prev.includes(mainGroup)
         ? prev.filter(g => g !== mainGroup)
         : [...prev, mainGroup]
     );
   };
 
   const toggleEbkpGroup = (code: string) => {
-    setExpandedEbkp(prev => 
-      prev.includes(code) 
+    setExpandedEbkp(prev =>
+      prev.includes(code)
         ? prev.filter(c => c !== code)
         : [...prev, code]
     );
@@ -212,18 +212,18 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
   const areAllGroupsExpanded = useMemo(() => {
     if (hierarchicalGroups && hierarchicalGroups.length > 0) {
       // Check if all main groups are expanded
-      const allMainGroupsExpanded = hierarchicalGroups.every(group => 
+      const allMainGroupsExpanded = hierarchicalGroups.every(group =>
         expandedMainGroups.includes(group.mainGroup)
       );
-      
+
       // Check if all sub-groups are expanded
-      const allSubGroupsCodes = hierarchicalGroups.flatMap(group => 
+      const allSubGroupsCodes = hierarchicalGroups.flatMap(group =>
         group.subGroups.map(subGroup => subGroup.code)
       );
-      const allSubGroupsExpanded = allSubGroupsCodes.every(code => 
+      const allSubGroupsExpanded = allSubGroupsCodes.every(code =>
         expandedEbkp.includes(code)
       );
-      
+
       return allMainGroupsExpanded && allSubGroupsExpanded;
     }
     return false;
@@ -238,7 +238,7 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
       // Expand all
       if (hierarchicalGroups) {
         const allMainGroups = hierarchicalGroups.map(group => group.mainGroup);
-        const allSubGroupsCodes = hierarchicalGroups.flatMap(group => 
+        const allSubGroupsCodes = hierarchicalGroups.flatMap(group =>
           group.subGroups.map(subGroup => subGroup.code)
         );
         setExpandedMainGroups(allMainGroups);
@@ -433,11 +433,11 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
               aValue = a.groupKey || "";
               bValue = b.groupKey || "";
               break;
-                          case "amortization":
-                // For grouped rows, amortization doesn't make sense as different elements might have different years
-                aValue = 0;
-                bValue = 0;
-                break;
+            case "amortization":
+              // For grouped rows, amortization doesn't make sense as different elements might have different years
+              aValue = 0;
+              bValue = 0;
+              break;
             default:
               return 0;
           }
@@ -714,7 +714,7 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
                     }
                     direction={
                       sortConfig?.key ===
-                      (isGrouped ? "elementCount" : "materials")
+                        (isGrouped ? "elementCount" : "materials")
                         ? sortConfig.direction
                         : "asc"
                     }
@@ -791,7 +791,7 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
           </TableHead>
           <TableBody>
             {/* Hierarchical EBKP Table */}
-            {groupBy === "ebkp" && hierarchicalGroups && hierarchicalGroups.length > 0 && 
+            {groupBy === "ebkp" && hierarchicalGroups && hierarchicalGroups.length > 0 &&
               hierarchicalGroups.map((hierarchicalGroup) => (
                 <React.Fragment key={hierarchicalGroup.mainGroup}>
                   <MainLcaEbkpGroupRow
@@ -817,7 +817,7 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
                 </React.Fragment>
               ))
             }
-            
+
             {/* Regular table content */}
             {groupBy !== "ebkp" && processedData.length === 0 && (
               <TableRow>
@@ -834,7 +834,7 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
                 </TableCell>
               </TableRow>
             )}
-            
+
             {/* Empty state for EBKP grouping */}
             {groupBy === "ebkp" && (!hierarchicalGroups || hierarchicalGroups.length === 0) && (
               <TableRow>
@@ -1027,7 +1027,7 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
           rowsPerPageOptions={[10, 25, 50, 100, { label: "Alle", value: -1 }]}
           labelRowsPerPage="Zeilen pro Seite:"
           labelDisplayedRows={({ from, to, count }) =>
-            `${from}–${to} von ${count !== -1 ? count : `mehr als ${to}`}`
+            `${from}-${to} von ${count !== -1 ? count : `mehr als ${to}`}`
           }
           sx={{
             border: 1,

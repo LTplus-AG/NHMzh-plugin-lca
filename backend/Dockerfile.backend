@@ -14,7 +14,6 @@ COPY . .
 # Build TypeScript code
 RUN npm run build
 
-# Expose WebSocket port
 EXPOSE 8002
 
 # Start the server using the compiled JS file
