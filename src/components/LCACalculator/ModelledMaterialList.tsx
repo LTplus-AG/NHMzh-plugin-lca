@@ -4,14 +4,7 @@ import {
   Paper,
   Box,
   Typography,
-  TextField,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
   Tooltip,
-  Chip,
   ToggleButtonGroup,
   ToggleButton,
   Slider,
@@ -52,6 +45,9 @@ const ModelledMaterialList: React.FC<ModelledMaterialListProps> = ({
   const [sortOrder, setSortOrder] = useState<"none" | "matched" | "unmatched">(
     "none"
   );
+  
+  // Store initial order snapshot for stable sorting in "Offen zuerst" mode
+  const [initialOrderSnapshot, setInitialOrderSnapshot] = useState<Material[]>([]);
   const theme = useTheme();
 
   const getMatchedOption = (materialId: string) => {
@@ -146,15 +142,24 @@ const ModelledMaterialList: React.FC<ModelledMaterialListProps> = ({
         return aMatched ? -1 : 1;
       });
     } else if (sortOrder === "unmatched") {
-      arr.sort((a, b) => {
-        const aMatched = isMaterialMatched(a.id);
-        const bMatched = isMaterialMatched(b.id);
-        if (aMatched === bMatched) return 0;
-        return aMatched ? 1 : -1;
-      });
+      // For "Offen zuerst" mode, use the stable snapshot to prevent jumping
+      if (initialOrderSnapshot.length > 0) {
+        // Sort based on the initial snapshot order, not current match status
+        return initialOrderSnapshot.filter(material => 
+          modelledMaterials.some(m => m.id === material.id)
+        );
+      } else {
+        // Fallback: create initial sort by unmatched first
+        arr.sort((a, b) => {
+          const aMatched = isMaterialMatched(a.id);
+          const bMatched = isMaterialMatched(b.id);
+          if (aMatched === bMatched) return 0;
+          return aMatched ? 1 : -1;
+        });
+      }
     }
     return arr;
-  }, [modelledMaterials, sortOrder, matches, kbobMaterials]);
+  }, [modelledMaterials, sortOrder, initialOrderSnapshot, matches, kbobMaterials]);
 
   const getSelectStylesForMaterial = (materialId: string) => {
     const base = selectStyles;
@@ -192,7 +197,24 @@ const ModelledMaterialList: React.FC<ModelledMaterialListProps> = ({
           size="small"
           exclusive
           value={sortOrder}
-          onChange={(_, val) => val && setSortOrder(val)}
+          onChange={(_, val) => {
+            if (val) {
+              setSortOrder(val);
+              // Create snapshot when switching to "Offen zuerst" mode
+              if (val === "unmatched") {
+                const sortedByUnmatched = [...modelledMaterials].sort((a, b) => {
+                  const aMatched = isMaterialMatched(a.id);
+                  const bMatched = isMaterialMatched(b.id);
+                  if (aMatched === bMatched) return 0;
+                  return aMatched ? 1 : -1;
+                });
+                setInitialOrderSnapshot(sortedByUnmatched);
+              } else {
+                // Clear snapshot when leaving "Offen zuerst" mode
+                setInitialOrderSnapshot([]);
+              }
+            }
+          }}
         >
           <ToggleButton value="none">Standard</ToggleButton>
           <ToggleButton value="unmatched">Offen zuerst</ToggleButton>
