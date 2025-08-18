@@ -2,7 +2,6 @@ import React from "react";
 import { Routes, Route } from "react-router-dom";
 import LCACalculator from "./components/LCACalculator.tsx";
 import { Box } from "@mui/material";
-import Header from "./components/ui/Header";
 import "./App.css";
 
 function App(): JSX.Element {
@@ -12,11 +11,10 @@ function App(): JSX.Element {
 
   return (
     <div className="app-container">
-      <Header />
       <Box
         className="content-container"
         sx={{
-          height: "calc(100vh - 64px)",
+          height: "100vh",
           width: "100vw",
           maxWidth: "100%",
           position: "relative",

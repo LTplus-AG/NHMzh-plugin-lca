@@ -175,7 +175,7 @@ const MaterialList: React.FC<MaterialListProps> = ({
                   <Chip
                     label={`${material.ebkp} - ${
                       ebkpData.find((e) => e.code === material.ebkp)
-                        ?.bezeichnung || ""
+                        ?.name || ""
                     }`}
                     size="small"
                     sx={{
