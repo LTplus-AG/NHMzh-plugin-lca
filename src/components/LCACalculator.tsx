@@ -29,6 +29,7 @@ import ReviewDialog from "./LCACalculator/ReviewDialog";
 import Sidebar from "./LCACalculator/Sidebar";
 import SuccessDialog from "./LCACalculator/SuccessDialog";
 import ProjectMetadataDisplay from "./ui/ProjectMetadataDisplay";
+import EmptyState from "./ui/EmptyState";
 
 // Import new lcaApi service
 import {
@@ -47,22 +48,13 @@ import { ProjectMetadata } from "../types/lca.types";
 import { getAmortizationYears } from "../utils/amortizationUtils";
 import { DEFAULT_AMORTIZATION_YEARS } from "../utils/constants";
 import { LCAImpactCalculator } from "../utils/lcaImpactCalculator";
+import { Upload as UploadIcon, Assessment as AssessmentIcon } from "@mui/icons-material";
+import { navigateToIfcUploader, navigateToQto, getCurrentPlugin } from "../utils/navigation";
 import logger from '../utils/logger';
 
 const calculator = new LCACalculator();
 
-const DEFAULT_PROJECT_OPTIONS: ProjectOption[] = [
-  { value: "67e391836c096bf72bc23d97", label: "Recyclingzentrum Juch-Areal" },
-  {
-    value: "67e392836c096bf72bc23d98",
-    label: "Gesamterneuerung Stadthausanlage",
-  },
-  { value: "67e393836c096bf72bc23d99", label: "Amtshaus Walche" },
-  {
-    value: "67e394836c096bf72bc23d9a",
-    label: "Gemeinschaftszentrum Wipkingen",
-  },
-];
+
 
 export default function LCACalculatorComponent(): JSX.Element {
   const theme = useTheme();
@@ -106,6 +98,7 @@ export default function LCACalculatorComponent(): JSX.Element {
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [projectOptions, setProjectOptions] = useState<ProjectOption[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
   const [displayMode, setDisplayMode] = useState<DisplayMode>("total");
   const [ebfInput, setEbfInput] = useState<string>("");
@@ -920,6 +913,7 @@ export default function LCACalculatorComponent(): JSX.Element {
     try {
       logger.info("[fetchProjects] Starting to fetch projects...");
       setProjectsLoading(true);
+      setProjectsError(null);
       setInitialLoading(true);
       const projectData = await getProjects();
       logger.info("[fetchProjects] Received projects:", projectData);
@@ -928,33 +922,22 @@ export default function LCACalculatorComponent(): JSX.Element {
         value: project.id,
         label: project.name,
       }));
-
-      const finalOptions =
-        options.length === 0 ? DEFAULT_PROJECT_OPTIONS : options;
       
-      logger.info("[fetchProjects] Final project options:", finalOptions);
-      setProjectOptions(finalOptions);
+      logger.info("[fetchProjects] Project options:", options);
+      setProjectOptions(options);
 
-      if (!selectedProject && finalOptions.length > 0) {
-        logger.info("[fetchProjects] Auto-selecting first project:", finalOptions[0].label);
-        setSelectedProject(finalOptions[0]);
+      if (!selectedProject && options.length > 0) {
+        logger.info("[fetchProjects] Auto-selecting first project:", options[0].label);
+        setSelectedProject(options[0]);
       } else {
         logger.info("[fetchProjects] Selected project already exists or no options available");
         setInitialLoading(false);
       }
     } catch (error) {
       logger.error("[fetchProjects] Error fetching projects:", error);
-      setProjectOptions(DEFAULT_PROJECT_OPTIONS);
-
-      if (!selectedProject && DEFAULT_PROJECT_OPTIONS.length > 0) {
-        logger.info(
-          "[fetchProjects] Auto-selecting first default project:",
-          DEFAULT_PROJECT_OPTIONS[0].label
-        );
-        setSelectedProject(DEFAULT_PROJECT_OPTIONS[0]);
-      } else {
-        setInitialLoading(false);
-      }
+      setProjectOptions([]);
+      setProjectsError("Fehler beim Laden der Projekte");
+      setInitialLoading(false);
     } finally {
       setProjectsLoading(false);
     }
@@ -1188,7 +1171,27 @@ export default function LCACalculatorComponent(): JSX.Element {
                 Projekt wird geladen...
               </Typography>
             </Box>
-          ) : (
+          ) : projectOptions.length === 0 && !projectsLoading ? (
+            <EmptyState
+              icon="assessment"
+              title="Keine Projekte mit LCA-Daten verfügbar"
+              description="Für die Ökobilanzierung sind IFC-Dateien und bestätigte Mengen aus dem Mengen-Modul erforderlich. Laden Sie zunächst eine IFC-Datei über den IFC Uploader hoch und bestätigen Sie die Mengen, oder wenden Sie sich an die zuständige Person."
+              actions={[
+                {
+                  label: "IFC Uploader öffnen",
+                  onClick: () => navigateToIfcUploader(getCurrentPlugin()),
+                  variant: "contained",
+                  startIcon: <UploadIcon />
+                },
+                {
+                  label: "QTO öffnen",
+                  onClick: () => navigateToQto(getCurrentPlugin()),
+                  variant: "outlined",
+                  startIcon: <AssessmentIcon />
+                }
+              ]}
+            />
+          ) : !selectedProject ? (
             <Box
               sx={{
                 display: "flex",
@@ -1206,7 +1209,21 @@ export default function LCACalculatorComponent(): JSX.Element {
                 Bitte wählen Sie ein Projekt aus, um die Ökobilanz zu berechnen.
               </Typography>
             </Box>
-          )}
+          ) : ifcElementsWithImpacts.length === 0 && !initialLoading ? (
+            <EmptyState
+              icon="assessment"
+              title="Noch keine bestätigten Mengen"
+              description="Für dieses Projekt sind noch keine bestätigten Mengen aus dem Mengen-Modul verfügbar. Bestätigen Sie zunächst die Mengen, damit die Ökobilanzberechnung durchgeführt werden kann."
+              actions={[
+                {
+                  label: "QTO öffnen",
+                  onClick: () => navigateToQto(getCurrentPlugin()),
+                  variant: "contained",
+                  startIcon: <AssessmentIcon />
+                }
+              ]}
+            />
+          ) : null}
         </Box>
       </Box>
       <ReviewDialog
