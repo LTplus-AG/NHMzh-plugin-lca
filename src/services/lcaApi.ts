@@ -6,7 +6,9 @@ import {
 import logger from '../utils/logger';
 
 const API_BASE_URL =
-  import.meta.env.VITE_LCA_BACKEND_URL || "http://localhost:8002";
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_LCA_BACKEND_URL ||
+  "http://localhost:8002";
 
 // Add proper type definition for LcaInstance
 export interface LcaInstance {
