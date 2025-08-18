@@ -47,7 +47,7 @@ const ModelledMaterialList: React.FC<ModelledMaterialListProps> = ({
   );
   
   // Store initial order snapshot for stable sorting in "Offen zuerst" mode
-  const [initialOrderSnapshot, setInitialOrderSnapshot] = useState<Material[]>([]);
+  const [initialOrderSnapshot, setInitialOrderSnapshot] = useState<Array<Material['id']>>([]);
   const theme = useTheme();
 
   const getMatchedOption = (materialId: string) => {
@@ -144,10 +144,23 @@ const ModelledMaterialList: React.FC<ModelledMaterialListProps> = ({
     } else if (sortOrder === "unmatched") {
       // For "Offen zuerst" mode, use the stable snapshot to prevent jumping
       if (initialOrderSnapshot.length > 0) {
-        // Sort based on the initial snapshot order, not current match status
-        return initialOrderSnapshot.filter(material => 
-          modelledMaterials.some(m => m.id === material.id)
+        // Sort current materials by snapshot order; append new items deterministically (unmatched first)
+        const indexById = new Map(initialOrderSnapshot.map((id, idx) => [id, idx]));
+        const [inSnapshot, newOnes] = arr.reduce<[Material[], Material[]]>(
+          (acc, m) => {
+            (indexById.has(m.id) ? acc[0] : acc[1]).push(m);
+            return acc;
+          },
+          [[], []]
         );
+        inSnapshot.sort((a, b) => (indexById.get(a.id)! - indexById.get(b.id)!));
+        newOnes.sort((a, b) => {
+          const aMatched = isMaterialMatched(a.id);
+          const bMatched = isMaterialMatched(b.id);
+          if (aMatched === bMatched) return 0;
+          return aMatched ? 1 : -1;
+        });
+        return [...inSnapshot, ...newOnes];
       } else {
         // Fallback: create initial sort by unmatched first
         arr.sort((a, b) => {
@@ -208,7 +221,7 @@ const ModelledMaterialList: React.FC<ModelledMaterialListProps> = ({
                   if (aMatched === bMatched) return 0;
                   return aMatched ? 1 : -1;
                 });
-                setInitialOrderSnapshot(sortedByUnmatched);
+                setInitialOrderSnapshot(sortedByUnmatched.map(m => m.id));
               } else {
                 // Clear snapshot when leaving "Offen zuerst" mode
                 setInitialOrderSnapshot([]);
