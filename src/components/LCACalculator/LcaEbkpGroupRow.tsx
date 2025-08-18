@@ -56,7 +56,7 @@ const ElementRow: React.FC<{
                 ID:
               </Typography>
               <CopyableText 
-                text={element.id}
+                text={element._id || 'N/A'}
                 variant="chip"
                 fontSize="0.7rem"
                 maxWidth="140px"
@@ -176,7 +176,7 @@ export const LcaEbkpGroupRow: React.FC<LcaEbkpGroupRowProps> = ({
       {/* Expandable elements */}
       {isExpanded && group.elements.map((element) => (
         <ElementRow
-          key={element.id}
+          key={element._id}
           element={element}
           outputFormat={outputFormat}
           displayMode={displayMode}

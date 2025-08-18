@@ -1,4 +1,4 @@
-import { BrowserRouter } from "react-router-dom";
+import AuthenticatedApp from "./AuthenticatedApp";
 import App from "./App";
 import { ThemeProvider, StyledEngineProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
@@ -8,6 +8,7 @@ import "./index.css";
 import "./App.css";
 
 // This version is for federation - it does NOT include a router because the host provides it
+// For federated apps, authentication is handled by the host
 const MicrofrontendApp = () => {
   return (
     <StyledEngineProvider injectFirst>
@@ -21,18 +22,7 @@ const MicrofrontendApp = () => {
   );
 };
 
-// This is used for standalone testing/dev
-export const StandaloneApp = () => (
-  <StyledEngineProvider injectFirst>
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <BrowserRouter>
-        <div style={{ width: "100%", height: "100vh", display: "flex" }}>
-          <App />
-        </div>
-      </BrowserRouter>
-    </ThemeProvider>
-  </StyledEngineProvider>
-);
+// This is used for standalone testing/dev with authentication
+export const StandaloneApp = () => <AuthenticatedApp />;
 
 export default MicrofrontendApp;

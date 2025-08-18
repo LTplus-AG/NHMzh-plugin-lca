@@ -14,6 +14,13 @@ import { QtoElement as QtoElementType } from "./types";
 import logger from "./logger";
 import { Request, Response } from "express";
 import { Kafka, Producer } from "kafkajs";
+import { 
+  authMiddleware, 
+  requireReadPermission, 
+  requireWritePermission, 
+  requireProjectAccess,
+  User 
+} from "./auth-middleware";
 
 let lcaDbInstance: Db | null = null;
 let qtoDbInstance: Db | null = null;
@@ -70,6 +77,12 @@ app.use(cors({
 
 app.use(express.json({ limit: "1mb" }));
 
+// --- Authentication Middleware ---
+// Apply authentication to all routes except health check
+app.use(authMiddleware({ optional: false }));
+// Skip authentication for health endpoint
+app.use("/health", authMiddleware({ optional: true }));
+
 // --- Input Validation Middleware ---
 const handleValidationErrors = (req: express.Request, res: express.Response, next: express.NextFunction) => {
   const errors = validationResult(req);
@@ -91,7 +104,7 @@ app.get("/health", (req, res) => res.status(200).json({
   timestamp: new Date().toISOString() 
 }));
 
-app.get("/api/kbob/materials", haltOnTimedout, async (req, res) => {
+app.get("/api/kbob/materials", haltOnTimedout, requireReadPermission, async (req, res) => {
   if (!lcaDbInstance) return res.status(503).json({ message: "Database not available" });
   try {
     const materials = await lcaDbInstance.collection(config.mongodb.collections.materialLibrary).find({}).toArray();
@@ -102,12 +115,23 @@ app.get("/api/kbob/materials", haltOnTimedout, async (req, res) => {
   }
 });
 
-app.get("/api/projects", haltOnTimedout, async (req, res) => {
+app.get("/api/projects", haltOnTimedout, requireReadPermission, async (req, res) => {
   if (!qtoDbInstance) return res.status(503).json({ message: "Database not available" });
   try {
-    const projects = await qtoDbInstance.collection("projects").find({}).toArray();
-    const formattedProjects = projects.map((p: any) => ({ id: p._id.toString(), name: p.name }));
-    res.json({ projects: formattedProjects });
+    // Get user from request (added by auth middleware)
+    const user = req.user as User;
+    
+    // For admin users, return all projects
+    if (user.roles.includes('Admin')) {
+      const projects = await qtoDbInstance.collection("projects").find({}).toArray();
+      const formattedProjects = projects.map((p: any) => ({ id: p._id.toString(), name: p.name }));
+      return res.json({ projects: formattedProjects });
+    }
+    
+    // For non-admin users, we need to filter projects based on user permissions
+    // This would require integration with the project service to get user's authorized projects
+    // For now, return empty array and let the project service handle project filtering
+    res.json({ projects: [] });
   } catch (error) {
     logger.error("Error fetching projects:", error);
     res.status(500).json({ error: "Failed to fetch projects" });
@@ -118,6 +142,7 @@ app.get("/api/projects/:projectId/materials",
   param('projectId').isMongoId().withMessage('Invalid project ID format'),
   handleValidationErrors,
   haltOnTimedout,
+  requireProjectAccess('read'),
   async (req, res) => {
     const { projectId } = req.params;
     if (!qtoDbInstance || !lcaDbInstance) return res.status(503).json({ message: "Database not available" });
@@ -167,6 +192,7 @@ app.post("/api/projects/:projectId/confirm-lca",
   body('materialDensities').isObject().withMessage('materialDensities must be an object'),
   handleValidationErrors,
   haltOnTimedout,
+  requireProjectAccess('write'),
   async (req, res) => {
     const { projectId } = req.params;
     const { lcaData, materialMappings, ebfValue, materialDensities } = req.body;

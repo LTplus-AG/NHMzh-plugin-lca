@@ -66,18 +66,19 @@ const getDisplayValue = (
   return value;
 };
 
-const getDecimalPrecision = (
-  value: number | undefined,
-  displayMode: DisplayMode
-): number => {
-  if (value === undefined) return 0;
-  if (displayMode === "relative" || Math.abs(value) < 1) {
-    return 2;
-  } else if (Math.abs(value) < 100) {
-    return 1;
-  }
-  return 0;
-};
+// Commented out unused function - can be removed if not needed later
+// const _getDecimalPrecision = (
+//   value: number | undefined,
+//   displayMode: DisplayMode
+// ): number => {
+//   if (value === undefined) return 0;
+//   if (displayMode === "relative" || Math.abs(value) < 1) {
+//     return 2;
+//   } else if (Math.abs(value) < 100) {
+//     return 1;
+//   }
+//   return 0;
+// };
 
 const formatDisplayValue = (
   value: number | undefined,
@@ -189,7 +190,7 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
   const impactKey = outputFormat.toLowerCase() as keyof MaterialImpact;
 
   // Use hierarchical groups hook for EBKP grouping
-  const { ebkpGroups, hierarchicalGroups } = useLcaEbkpGroups(elements);
+  const { hierarchicalGroups } = useLcaEbkpGroups(elements);
 
   // Expand/collapse functionality
   const toggleMainGroup = (mainGroup: string) => {
@@ -259,7 +260,7 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
     // 2. Filter by Autocomplete value or input text
     if (selectedValue) {
       filteredElements = filteredElements.filter(
-        (el) => el.id === selectedValue.id
+        (el) => el._id === selectedValue._id
       );
     } else if (inputValue) {
       const lowerSearchTerm = inputValue.toLowerCase();
@@ -270,7 +271,7 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
           .toLowerCase();
         const ebkpCode = element.properties?.ebkp_code?.toLowerCase() || "";
         const ebkpName = element.properties?.ebkp_name?.toLowerCase() || "";
-        const ifcClass = element.element_type.toLowerCase();
+        const ifcClass = element.element_type?.toLowerCase() || '';
         const typeName = element.type_name?.toLowerCase() || "";
 
         return (
@@ -578,7 +579,7 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
                     option.properties?.ebkp_code?.toLowerCase() || "";
                   const ebkpName =
                     option.properties?.ebkp_name?.toLowerCase() || "";
-                  const ifcClass = option.element_type.toLowerCase();
+                  const ifcClass = option.element_type?.toLowerCase() || '';
                   const typeName = option.type_name?.toLowerCase() || "";
                   return (
                     ifcClass.includes(lowerSearchTerm) ||
@@ -601,7 +602,7 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
             renderOption={(props, option) => {
               const { key, ...otherProps } = props as any;
               return (
-                <li key={option.id} {...otherProps}>
+                <li key={option._id} {...otherProps}>
                   <Box
                     sx={{
                       display: "flex",
@@ -620,7 +621,7 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
               );
             }}
             noOptionsText="Keine passenden Elemente gefunden"
-            isOptionEqualToValue={(option, value) => option.id === value.id}
+            isOptionEqualToValue={(option, value) => option._id === value._id}
             sx={{ width: "100%" }}
           />
         </Box>
@@ -940,9 +941,9 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
 
                 return (
                   <TableRow
-                    key={element.id + index}
+                    key={(element._id || 'unknown') + index}
                     hover
-                    selected={selectedValue?.id === element.id}
+                    selected={selectedValue?._id === element._id}
                   >
                     <TableCell
                       sx={{
