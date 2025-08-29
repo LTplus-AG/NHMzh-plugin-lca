@@ -41,6 +41,14 @@ export const config = {
     lcaTopic: process.env.KAFKA_TOPIC_LCA || "lca-data",
     // Add other topics if needed
   },
+  keycloak: {
+    authority: process.env.KEYCLOAK_AUTHORITY || "http://localhost:8080/realms/nhmzh",
+    clientId: process.env.KEYCLOAK_CLIENT_ID || "plugin-lca",
+    clientSecret: process.env.KEYCLOAK_CLIENT_SECRET,
+  },
+  projectService: {
+    url: process.env.PROJECT_SERVICE_URL || "http://localhost:3001",
+  },
 };
 
 // Validate required environment variables for MongoDB URI construction

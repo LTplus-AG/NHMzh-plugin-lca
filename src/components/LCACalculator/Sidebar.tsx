@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   Box,
   Button,
@@ -17,7 +16,7 @@ import {
 } from "@mui/material";
 import Select from "react-select";
 import { ProjectOption } from "../../types/calculator.types";
-import { OutputFormats, OutputFormatLabels } from "../../types/lca.types";
+import { OutputFormatLabels, OutputFormats } from "../../types/lca.types";
 
 interface SidebarProps {
   selectedProject: ProjectOption | null;

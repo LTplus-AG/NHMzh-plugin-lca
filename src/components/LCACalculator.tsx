@@ -98,7 +98,7 @@ export default function LCACalculatorComponent(): JSX.Element {
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [projectOptions, setProjectOptions] = useState<ProjectOption[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
-  const [projectsError, setProjectsError] = useState<string | null>(null);
+  const [, setProjectsError] = useState<string | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
   const [displayMode, setDisplayMode] = useState<DisplayMode>("total");
   const [ebfInput, setEbfInput] = useState<string>("");
