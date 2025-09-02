@@ -19,6 +19,7 @@ import {
   FormControl,
   InputLabel,
   IconButton,
+  SelectChangeEvent,
 } from "@mui/material";
 import { ChevronRight } from "@mui/icons-material";
 import {
@@ -66,18 +67,7 @@ const getDisplayValue = (
   return value;
 };
 
-const getDecimalPrecision = (
-  value: number | undefined,
-  displayMode: DisplayMode
-): number => {
-  if (value === undefined) return 0;
-  if (displayMode === "relative" || Math.abs(value) < 1) {
-    return 2;
-  } else if (Math.abs(value) < 100) {
-    return 1;
-  }
-  return 0;
-};
+
 
 const formatDisplayValue = (
   value: number | undefined,
@@ -189,7 +179,7 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
   const impactKey = outputFormat.toLowerCase() as keyof MaterialImpact;
 
   // Use hierarchical groups hook for EBKP grouping
-  const { ebkpGroups, hierarchicalGroups } = useLcaEbkpGroups(elements);
+  const { hierarchicalGroups } = useLcaEbkpGroups(elements);
 
   // Expand/collapse functionality
   const toggleMainGroup = (mainGroup: string) => {
@@ -259,7 +249,7 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
     // 2. Filter by Autocomplete value or input text
     if (selectedValue) {
       filteredElements = filteredElements.filter(
-        (el) => el.id === selectedValue.id
+        (el) => el.guid === selectedValue.guid
       );
     } else if (inputValue) {
       const lowerSearchTerm = inputValue.toLowerCase();
@@ -268,9 +258,9 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
           .map((m) => m.name)
           .join(",")
           .toLowerCase();
-        const ebkpCode = element.properties?.ebkp_code?.toLowerCase() || "";
-        const ebkpName = element.properties?.ebkp_name?.toLowerCase() || "";
-        const ifcClass = element.element_type.toLowerCase();
+        const ebkpCode = (element.properties?.ebkp_code || element.ebkp || "")?.toLowerCase() || "";
+        const ebkpName = (element.properties?.ebkp_name || element.ebkp || "")?.toLowerCase() || "";
+        const ifcClass = element.element_type?.toLowerCase() || "";
         const typeName = element.type_name?.toLowerCase() || "";
 
         return (
@@ -286,8 +276,8 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
     // 3. Apply Sorting to individual elements if *not* grouping
     if (groupBy === "none" && sortConfig !== null) {
       filteredElements.sort((a, b) => {
-        let aValue: any;
-        let bValue: any;
+        let aValue: string | number | undefined;
+        let bValue: string | number | undefined;
 
         switch (sortConfig.key) {
           case "ifc_class":
@@ -307,8 +297,8 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
             bValue = b.quantity ?? 0;
             break;
           case "ebkp":
-            aValue = a.properties?.ebkp_code || "";
-            bValue = b.properties?.ebkp_code || "";
+            aValue = a.properties?.ebkp_code || a.ebkp || "";
+            bValue = b.properties?.ebkp_code || b.ebkp || "";
             break;
           case "impact":
             aValue =
@@ -387,8 +377,8 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
       // 5. Apply Sorting to Grouped Data
       if (sortConfig !== null) {
         groupedArray.sort((a, b) => {
-          let aValue: any;
-          let bValue: any;
+          let aValue: string | number | undefined;
+          let bValue: string | number | undefined;
 
           switch (sortConfig.key) {
             case "groupKey":
@@ -411,7 +401,7 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
               aValue = a.totalQuantity ?? 0;
               bValue = b.totalQuantity ?? 0;
               break;
-            case "impact":
+            case "impact": {
               const impactKeyGroup =
                 outputFormat.toLowerCase() as keyof MaterialImpact;
               aValue =
@@ -428,6 +418,7 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
                   ebfNumeric,
                   DEFAULT_AMORTIZATION_YEARS
                 ) ?? -Infinity;
+              }
               break;
             case "ebkp":
               aValue = a.groupKey || "";
@@ -501,8 +492,8 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
   // Function to get label for Autocomplete options
   const getOptionLabelText = (option: LcaElement): string => {
     const typeNamePart = option.type_name ? ` / ${option.type_name}` : "";
-    const ebkp = option.properties?.ebkp_code
-      ? ` (${option.properties.ebkp_code})`
+    const ebkp = option.properties?.ebkp_code || option.ebkp
+      ? ` (${option.properties?.ebkp_code || option.ebkp})`
       : "";
     return `${option.element_type}${typeNamePart}${ebkp}`;
   };
@@ -524,7 +515,7 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
 
   // Handler for Grouping Change
   const handleGroupByChange = (
-    event: React.ChangeEvent<{ value: unknown }>
+    event: SelectChangeEvent<GroupingMode>
   ) => {
     setGroupBy(event.target.value as GroupingMode);
     setPage(0);
@@ -575,10 +566,10 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
                     .join(",")
                     .toLowerCase();
                   const ebkpCode =
-                    option.properties?.ebkp_code?.toLowerCase() || "";
+                    (option.properties?.ebkp_code || option.ebkp || "")?.toLowerCase() || "";
                   const ebkpName =
-                    option.properties?.ebkp_name?.toLowerCase() || "";
-                  const ifcClass = option.element_type.toLowerCase();
+                    (option.properties?.ebkp_name || option.ebkp || "")?.toLowerCase() || "";
+                  const ifcClass = option.element_type?.toLowerCase() || "";
                   const typeName = option.type_name?.toLowerCase() || "";
                   return (
                     ifcClass.includes(lowerSearchTerm) ||
@@ -599,9 +590,9 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
               />
             )}
             renderOption={(props, option) => {
-              const { key, ...otherProps } = props as any;
+              const { key, ...otherProps } = props;
               return (
-                <li key={option.id} {...otherProps}>
+                <li key={option.guid} {...otherProps}>
                   <Box
                     sx={{
                       display: "flex",
@@ -620,7 +611,7 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
               );
             }}
             noOptionsText="Keine passenden Elemente gefunden"
-            isOptionEqualToValue={(option, value) => option.id === value.id}
+            isOptionEqualToValue={(option, value) => option.guid === value.guid}
             sx={{ width: "100%" }}
           />
         </Box>
@@ -632,7 +623,7 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
             id="group-by-select"
             value={groupBy}
             label="Gruppieren nach"
-            onChange={handleGroupByChange as any}
+            onChange={handleGroupByChange}
           >
             <MenuItem value="none">Keine Gruppierung</MenuItem>
             <MenuItem value="ifcClass">IFC Klasse</MenuItem>
@@ -792,18 +783,18 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
           <TableBody>
             {/* Hierarchical EBKP Table */}
             {groupBy === "ebkp" && hierarchicalGroups && hierarchicalGroups.length > 0 &&
-              hierarchicalGroups.map((hierarchicalGroup) => (
-                <React.Fragment key={hierarchicalGroup.mainGroup}>
-                  <MainLcaEbkpGroupRow
-                    group={hierarchicalGroup}
-                    isExpanded={expandedMainGroups.includes(hierarchicalGroup.mainGroup)}
-                    onToggle={() => toggleMainGroup(hierarchicalGroup.mainGroup)}
-                    outputFormat={outputFormat}
-                    displayMode={displayMode}
-                    ebfNumeric={ebfNumeric}
-                  />
-                  {expandedMainGroups.includes(hierarchicalGroup.mainGroup) &&
-                    hierarchicalGroup.subGroups.map((subGroup) => (
+              hierarchicalGroups.flatMap((hierarchicalGroup) => [
+                <MainLcaEbkpGroupRow
+                  key={`${hierarchicalGroup.mainGroup}-main`}
+                  group={hierarchicalGroup}
+                  isExpanded={expandedMainGroups.includes(hierarchicalGroup.mainGroup)}
+                  onToggle={() => toggleMainGroup(hierarchicalGroup.mainGroup)}
+                  outputFormat={outputFormat}
+                  displayMode={displayMode}
+                  ebfNumeric={ebfNumeric}
+                />,
+                ...(expandedMainGroups.includes(hierarchicalGroup.mainGroup)
+                  ? hierarchicalGroup.subGroups.map((subGroup) => (
                       <LcaEbkpGroupRow
                         key={subGroup.code}
                         group={subGroup}
@@ -813,9 +804,10 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
                         displayMode={displayMode}
                         ebfNumeric={ebfNumeric}
                       />
-                    ))}
-                </React.Fragment>
-              ))
+                    ))
+                  : []
+                )
+              ])
             }
 
             {/* Regular table content */}
@@ -928,9 +920,9 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
                 const materialsString = element.materials
                   .map((m) => m.name)
                   .join(", ");
-                const ebkpCode = element.properties?.ebkp_code || "N/A";
-                const ebkpName = element.properties?.ebkp_name;
-                const ebkpTooltip = ebkpName
+                const ebkpCode = element.properties?.ebkp_code || element.ebkp || "N/A";
+                const ebkpName = element.properties?.ebkp_name || element.ebkp;
+                const ebkpTooltip = ebkpName && ebkpName !== ebkpCode
                   ? `${ebkpCode} - ${ebkpName}`
                   : ebkpCode;
                 const ifcClassDisplay = element.element_type || "N/A";
@@ -940,9 +932,9 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
 
                 return (
                   <TableRow
-                    key={element.id + index}
+                    key={element.guid + index}
                     hover
-                    selected={selectedValue?.id === element.id}
+                    selected={selectedValue?.guid === element.guid}
                   >
                     <TableCell
                       sx={{

@@ -1,4 +1,45 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
+
+// Component for handling text overflow with tooltip
+const OverflowText: React.FC<{ text: string }> = ({ text }) => {
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+
+  useEffect(() => {
+    const element = textRef.current;
+    if (element) {
+      setIsOverflowing(element.scrollWidth > element.clientWidth);
+    }
+  }, [text]);
+
+  const typography = (
+    <Typography
+      ref={textRef}
+      variant="h6"
+      noWrap
+      component="span"
+      sx={{
+        fontWeight: 600,
+        color: "text.primary",
+        fontSize: { xs: "1rem", sm: "1.1rem" },
+        flexGrow: 1,
+        flexShrink: 1,
+        minWidth: 0,
+        display: "block",
+      }}
+    >
+      {text}
+    </Typography>
+  );
+
+  return isOverflowing ? (
+    <Tooltip title={text} enterDelay={1000}>
+      {typography}
+    </Tooltip>
+  ) : (
+    typography
+  );
+};
 import {
   Grid,
   Paper,
@@ -11,6 +52,7 @@ import {
 } from "@mui/material";
 import { useTheme, alpha } from "@mui/material/styles";
 import Select from "react-select";
+import { StylesConfig, CSSObjectWithLabel } from "react-select";
 import { KbobMaterial, Material, MaterialImpact, OutputFormats } from "../../types/lca.types";
 import { MaterialOption, MaterialOptionGroup } from "../../types/calculator.types";
 
@@ -22,7 +64,7 @@ interface ModelledMaterialListProps {
   kbobMaterialOptions:
     | MaterialOption[]
     | ((materialId: string) => MaterialOption[] | MaterialOptionGroup[]);
-  selectStyles: any;
+  selectStyles: StylesConfig;
   onDeleteMaterial: (id: string) => void;
   handleDensityUpdate?: (materialId: string, newDensity: number) => void;
   materialDensities?: Record<string, number>;
@@ -174,13 +216,13 @@ const ModelledMaterialList: React.FC<ModelledMaterialListProps> = ({
     return arr;
   }, [modelledMaterials, sortOrder, initialOrderSnapshot, matches, kbobMaterials]);
 
-  const getSelectStylesForMaterial = (materialId: string) => {
+  const getSelectStylesForMaterial = (materialId: string): StylesConfig => {
     const base = selectStyles;
     if (!isMaterialMatched(materialId)) {
       return {
         ...base,
-        control: (provided: any, state: any) => ({
-          ...(base.control ? base.control(provided, state) : provided),
+        control: (provided: CSSObjectWithLabel, state: any) => ({
+          ...(base.control ? base.control(provided, state as any) : provided),
           borderColor: theme.palette.primary.main,
           boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.3)}`,
         }),
@@ -279,47 +321,7 @@ const ModelledMaterialList: React.FC<ModelledMaterialListProps> = ({
                   }}
                 >
                   {/* Material Name with conditional tooltip */}
-                  {(() => {
-                    const textRef = useRef<HTMLSpanElement>(null);
-                    const [isOverflowing, setIsOverflowing] = useState(false);
-
-                    useEffect(() => {
-                      const element = textRef.current;
-                      if (element) {
-                        setIsOverflowing(
-                          element.scrollWidth > element.clientWidth
-                        );
-                      }
-                    }, [material.name]);
-
-                    const typography = (
-                      <Typography
-                        ref={textRef}
-                        variant="h6"
-                        noWrap
-                        component="span"
-                        sx={{
-                          fontWeight: 600,
-                          color: "text.primary",
-                          fontSize: { xs: "1rem", sm: "1.1rem" },
-                          flexGrow: 1,
-                          flexShrink: 1,
-                          minWidth: 0,
-                          display: "block",
-                        }}
-                      >
-                        {material.name}
-                      </Typography>
-                    );
-
-                    return isOverflowing ? (
-                      <Tooltip title={material.name} enterDelay={1000}>
-                        {typography}
-                      </Tooltip>
-                    ) : (
-                      typography
-                    );
-                  })()}
+                  <OverflowText text={material.name} />
                 </Box>
 
                 {/* Volume Badge */}
@@ -370,8 +372,8 @@ const ModelledMaterialList: React.FC<ModelledMaterialListProps> = ({
                     value={getMatchedOption(material.id)}
                     onChange={(newValue) => {
                       const newMatches = { ...matches };
-                      if (newValue) {
-                        newMatches[material.id] = newValue.value;
+                      if (newValue && typeof newValue === 'object' && 'value' in newValue) {
+                        newMatches[material.id] = (newValue as any).value;
                       } else {
                         delete newMatches[material.id];
                       }

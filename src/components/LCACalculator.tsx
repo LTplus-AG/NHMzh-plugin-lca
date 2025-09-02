@@ -8,6 +8,7 @@ import {
   useTheme
 } from "@mui/material";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CSSObjectWithLabel } from "react-select";
 import { kbobService } from "../services/kbobService";
 import {
   ModelledMaterials as DefaultModelledMaterials,
@@ -54,7 +55,58 @@ import logger from '../utils/logger';
 
 const calculator = new LCACalculator();
 
+// Raw data interfaces for API response transformation
+interface RawMaterial {
+  id?: string;
+  name?: string;
+  volume?: number | string;
+  unit?: string;
+  kbob_id?: string;
+}
 
+/**
+ * IFC ELEMENT IDENTIFICATION SYSTEM - GLOBAL_ID (GUID) USAGE
+ *
+ * CRITICAL: Throughout the entire system (QTO → LCA → Cost), we use 'global_id'
+ * as the ONLY identifier for IFC elements. This ensures consistent element
+ * identification across all components.
+ *
+ * GUID FLOW:
+ * 1. QTO System: Parses IFC files, extracts GlobalId → stores as 'global_id' in database
+ * 2. LCA System: Receives 'global_id' from QTO API → uses as element identifier
+ * 3. Cost System: Receives 'global_id' via Kafka → uses for cost calculations/matching
+ * 4. Kafka Messages: Always send 'global_id' as element identifier (never 'id', 'guid', etc.)
+ *
+ * WHY global_id ONLY:
+ * - It's the original IFC GlobalId from the IFC file (standardized identifier)
+ * - Consistent across all systems and transformations
+ * - Prevents element identification mismatches
+ * - Enables proper element tracking from IFC file → final cost calculations
+ *
+ * NEVER USE: 'id', 'guid', '_id', or any other field for element identification
+ */
+interface RawElement {
+  global_id?: string;  // PRIMARY: Original IFC GUID from database (ONLY identifier used)
+  guid?: string;  // Alternative field name (fallback - should not be used)
+  id?: string;  // Additional fallback (should not be used)
+  name?: string;
+  ifc_class?: string;
+  element_type?: string;
+  type_name?: string;
+  quantity?: number;
+  ebkp?: string;
+  materials?: RawMaterial[];
+  properties?: Record<string, unknown>;
+  classification?: {
+    system?: string;
+    id?: string;
+    name?: string;
+  };
+  amortization_years?: number;
+  updated_at?: string;
+  created_at?: string;
+  impact?: any;  // Some elements may already have impact data
+}
 
 export default function LCACalculatorComponent(): JSX.Element {
   const theme = useTheme();
@@ -98,7 +150,7 @@ export default function LCACalculatorComponent(): JSX.Element {
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [projectOptions, setProjectOptions] = useState<ProjectOption[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
-  const [projectsError, setProjectsError] = useState<string | null>(null);
+
   const [initialLoading, setInitialLoading] = useState(true);
   const [displayMode, setDisplayMode] = useState<DisplayMode>("total");
   const [ebfInput, setEbfInput] = useState<string>("");
@@ -145,34 +197,74 @@ export default function LCACalculatorComponent(): JSX.Element {
   ]);
 
   // Helper function to ensure elements conform to LcaElement type
-  const ensureElementsConform = (elements: any[]): LcaElement[] => {
+  const ensureElementsConform = (elements: unknown[]): LcaElement[] => {
     if (!Array.isArray(elements)) return [];
-    return elements.map((element: any, index: number): LcaElement => {
-      const materials = (element.materials || []).map((mat: any) => ({
+    return elements.map((element: unknown, index: number): LcaElement => {
+      const rawElement = element as RawElement;
+      const materials = (rawElement.materials || []).map((mat: RawMaterial) => ({
         id: mat.id || mat.name || `mat-${index}-${Math.random()}`,
         name: mat.name || "Unknown Material",
         volume: parseFloat(String(mat.volume ?? 0)),
         unit: mat.unit || "m³",
-        kbob_id: mat.kbob_id,
+        kbobMaterialId: mat.kbob_id,
       }));
 
-      const properties = element.properties || {};
+      const properties = rawElement.properties || {};
+
       if (
-        element.classification &&
-        (element.classification.system === "EBKP" ||
-          element.classification.system === "EBKP-H")
+        rawElement.classification &&
+        (rawElement.classification.system === "EBKP" ||
+          rawElement.classification.system === "EBKP-H")
       ) {
-        properties.ebkp_code = element.classification.id;
-        properties.ebkp_name = element.classification.name;
+        properties.ebkp_code = rawElement.classification.id;
+        properties.ebkp_name = rawElement.classification.name;
+      } else if (rawElement.ebkp) {
+        // Fallback: use direct ebkp field if available
+        properties.ebkp_code = rawElement.ebkp;
+        properties.ebkp_name = rawElement.ebkp; // Use same value for name as fallback
       }
 
       // Initialize impact as undefined, it will be calculated later
+
+      /**
+       * CRITICAL: Element GUID Extraction
+       * We MUST use global_id as the ONLY identifier for IFC elements.
+       * This ensures consistency across QTO → LCA → Cost systems.
+       *
+       * Primary: global_id (original IFC GlobalId from database)
+       * Fallbacks: Only used if global_id is missing (should not happen in normal operation)
+       */
+      let guid = rawElement.global_id ||  // PRIMARY: Original IFC GUID (ONLY field to use)
+                 rawElement.guid ||  // Fallback: Alternative naming (avoid if possible)
+                 rawElement.id;  // Last fallback: Generic id (avoid if possible)
+
+      if (!guid) {
+        // Try to extract from properties or other fields
+        if (rawElement.properties && typeof rawElement.properties === 'object') {
+          const props = rawElement.properties as Record<string, unknown>;
+          guid = (props.globalId as string) || (props.guid as string) || (props.GlobalId as string) || (props.GUID as string);
+        }
+      }
+
+      if (!guid) {
+        // Last resort: use database _id if available, otherwise generate meaningful ID
+        if ((rawElement as any)._id) {
+          guid = String((rawElement as any)._id);
+        } else {
+          // Generate a meaningful fallback based on element characteristics
+          const namePart = (rawElement.name || rawElement.type_name || 'unknown').replace(/[^a-zA-Z0-9]/g, '').substring(0, 8);
+          const typePart = (rawElement.element_type || rawElement.ifc_class || 'unknown').replace(/[^a-zA-Z0-9]/g, '').substring(0, 4);
+          guid = `AUTO-${typePart}-${namePart}-${index}`;
+          console.warn(`[ensureElementsConform] Generated fallback GUID for element ${index}: ${guid}`);
+        }
+      }
+
       return {
-        guid: element.global_id || element.id || `elem-${index}`,
-        name: element.name || element.type_name || "Unknown Element",
-        ifc_class: element.element_type || element.ifc_class || "Unknown",
-        element_type: element.element_type || element.ifc_class || "Unknown Element",
-        type_name: element.type_name,
+        guid,
+        name: rawElement.name || rawElement.type_name || "Unknown Element",
+        ifc_class: rawElement.element_type || rawElement.ifc_class || "Unknown",
+        element_type: rawElement.element_type || rawElement.ifc_class || "Unknown Element",
+        type_name: rawElement.type_name,
         quantity: materials.reduce(
           (sum: number, mat: { volume: number }) => sum + mat.volume,
           0
@@ -195,12 +287,12 @@ export default function LCACalculatorComponent(): JSX.Element {
 
     return elements.map((element) => {
       let elementImpact: MaterialImpact = { gwp: 0, ubp: 0, penr: 0 };
-      const amortYears = getAmortizationYears(
-        element.properties?.ebkp_code ?? "",
-        DEFAULT_AMORTIZATION_YEARS
-      );
+          const amortYears = getAmortizationYears(
+      element.properties?.ebkp_code ?? "",
+      DEFAULT_AMORTIZATION_YEARS
+    );
 
-      element.materials.forEach((material) => {
+    element.materials.forEach((material: Material) => {
         const kbobId = currentMatches[material.id];
         const kbobMaterial = kbobId ? kbobMap.get(kbobId) : undefined;
 
@@ -271,7 +363,7 @@ export default function LCACalculatorComponent(): JSX.Element {
         if (projectData && projectData.ifcData) {
           const rawElements = projectData.ifcData.elements || [];
           logger.info("[loadProjectMaterials] Raw elements count:", rawElements.length);
-          logger.debug("[loadProjectMaterials] First 3 raw elements:", rawElements.slice(0, 3));
+
 
           const conformingElementsInput = ensureElementsConform(rawElements);
           logger.info("[loadProjectMaterials] Conforming elements count:", conformingElementsInput.length);
@@ -294,7 +386,7 @@ export default function LCACalculatorComponent(): JSX.Element {
           let materialsArray: Material[] = [];
           const materialMap = new Map<string, { volume: number; id: string }>();
           conformingElementsInput.forEach((element) => {
-            element.materials.forEach((material) => {
+            element.materials.forEach((material: Material) => {
               if (material.id && material.volume > 0) {
                 const existing = materialMap.get(material.id);
                 materialMap.set(material.id, {
@@ -311,17 +403,15 @@ export default function LCACalculatorComponent(): JSX.Element {
             unit: "m³",
           }));
 
-          logger.info("[loadProjectMaterials] Materials array:", materialsArray);
-          logger.info("[loadProjectMaterials] Materials count:", materialsArray.length);
+          logger.info("[loadProjectMaterials] Processed materials count:", materialsArray.length);
 
           setModelledMaterials(materialsArray);
 
           // Restore saved material densities
           if (projectData.materialDensities) {
-            logger.info("[loadProjectMaterials] Restoring material densities:", projectData.materialDensities);
+            logger.info("[loadProjectMaterials] Restoring saved material densities");
             setMaterialDensities(projectData.materialDensities);
           } else {
-            logger.info("[loadProjectMaterials] No saved material densities found");
             setMaterialDensities({});
           }
 
@@ -339,10 +429,9 @@ export default function LCACalculatorComponent(): JSX.Element {
           }
 
           if (projectData.materialMappings) {
-            logger.info("[loadProjectMaterials] Material mappings:", projectData.materialMappings);
+            logger.info("[loadProjectMaterials] Restoring saved material mappings");
             setMatches(projectData.materialMappings);
           } else {
-            logger.info("[loadProjectMaterials] No material mappings found");
             setMatches({});
           }
 
@@ -505,7 +594,7 @@ export default function LCACalculatorComponent(): JSX.Element {
 
   const selectStyles = useMemo(
     () => ({
-      control: (provided: any) => ({
+      control: (provided: CSSObjectWithLabel) => ({
         ...provided,
         borderRadius: theme.shape.borderRadius,
         borderColor: theme.palette.divider,
@@ -518,14 +607,14 @@ export default function LCACalculatorComponent(): JSX.Element {
           borderColor: theme.palette.primary.main,
         },
       }),
-      option: (provided: any, state: any) => ({
+      option: (provided: CSSObjectWithLabel, state: any) => ({
         ...provided,
         backgroundColor: theme.palette.background.paper,
         color: state.isDisabled
           ? theme.palette.text.disabled
           : theme.palette.text.primary,
         cursor: state.isDisabled ? "not-allowed" : "default",
-        fontWeight: state.data.className === "suggestion-option" ? 500 : 400,
+        fontWeight: (state.data as MaterialOption)?.className === "suggestion-option" ? 500 : 400,
         fontSize: "0.875rem",
         padding: "8px",
         outline: state.isSelected
@@ -536,7 +625,7 @@ export default function LCACalculatorComponent(): JSX.Element {
           backgroundColor: theme.palette.action.hover,
         },
       }),
-      menu: (provided: any) => ({
+      menu: (provided: CSSObjectWithLabel) => ({
         ...provided,
         backgroundColor: theme.palette.background.paper,
         borderColor: theme.palette.divider,
@@ -544,31 +633,30 @@ export default function LCACalculatorComponent(): JSX.Element {
         boxShadow: theme.shadows[1],
         zIndex: 1500,
       }),
-      singleValue: (provided: any) => ({
+      singleValue: (provided: CSSObjectWithLabel) => ({
         ...provided,
         color: theme.palette.text.primary,
       }),
-      input: (provided: any) => ({
+      input: (provided: CSSObjectWithLabel) => ({
         ...provided,
         color: theme.palette.text.primary,
       }),
-      placeholder: (provided: any) => ({
+      placeholder: (provided: CSSObjectWithLabel) => ({
         ...provided,
         color: theme.palette.text.secondary,
       }),
-      group: (provided: any) => ({
+      group: (provided: CSSObjectWithLabel) => ({
         ...provided,
         padding: 0,
         "& .css-1rhbuit-multiValue": {
           backgroundColor: theme.palette.primary.light,
         },
       }),
-      groupHeading: (provided: any) => ({
+      groupHeading: (provided: CSSObjectWithLabel) => ({
         ...provided,
         fontSize: "0.75rem",
         color: theme.palette.text.secondary,
         fontWeight: 600,
-        textTransform: "none",
         backgroundColor: theme.palette.grey[50],
         padding: "8px 12px",
         marginBottom: 4,
@@ -681,7 +769,7 @@ export default function LCACalculatorComponent(): JSX.Element {
     }
   };
 
-  const handleSave = async (_data: any): Promise<void> => {
+  const handleSave = async (_data: unknown): Promise<void> => {
     if (!selectedProject?.value || !ifcResult?.ifcData?.elements) {
       throw new Error("Project, elements, or metadata not available");
     }
@@ -699,7 +787,7 @@ export default function LCACalculatorComponent(): JSX.Element {
       timestamp: projectMetadata?.upload_timestamp || new Date().toISOString(),
       fileId: selectedProject.value,
       data: finalElementsWithImpact.flatMap((el) =>
-        (el.materials || []).map((mat, matIndex) => {
+        (el.materials || []).map((mat: Material, matIndex: number) => {
           const kbobId = matches[mat.id];
           const kbobMat = kbobMaterials.find((k) => k.id === kbobId);
           const impact = kbobMat
@@ -759,7 +847,7 @@ export default function LCACalculatorComponent(): JSX.Element {
         densitySaveTimerRef.current = setTimeout(async () => {
           try {
             // await saveMaterialDensities(selectedProject.value, updated); // Removed as per edit hint
-            logger.info(`[Auto-save] Density saved for material ${materialId}: ${density}`);
+
           } catch (error) {
             logger.error("[Auto-save] Failed to save density:", error);
             // Optionally show a user notification here
@@ -785,9 +873,6 @@ export default function LCACalculatorComponent(): JSX.Element {
   // Add logging to verify KBOB materials are loaded
   useEffect(() => {
     logger.info("KBOB materials loaded:", kbobMaterials.length);
-    if (kbobMaterials.length > 0) {
-      logger.debug("Sample KBOB material:", kbobMaterials[0]);
-    }
   }, [kbobMaterials]);
 
   // Calculate aggregated impacts for the ModelledMaterialList
@@ -911,32 +996,27 @@ export default function LCACalculatorComponent(): JSX.Element {
 
   const fetchProjects = async () => {
     try {
-      logger.info("[fetchProjects] Starting to fetch projects...");
       setProjectsLoading(true);
-      setProjectsError(null);
+
       setInitialLoading(true);
       const projectData = await getProjects();
-      logger.info("[fetchProjects] Received projects:", projectData);
-      
+
       const options = projectData.map((project) => ({
         value: project.id,
         label: project.name,
       }));
-      
-      logger.info("[fetchProjects] Project options:", options);
+
       setProjectOptions(options);
 
       if (!selectedProject && options.length > 0) {
-        logger.info("[fetchProjects] Auto-selecting first project:", options[0].label);
         setSelectedProject(options[0]);
       } else {
-        logger.info("[fetchProjects] Selected project already exists or no options available");
         setInitialLoading(false);
       }
     } catch (error) {
-      logger.error("[fetchProjects] Error fetching projects:", error);
+      logger.error("Error fetching projects:", error);
       setProjectOptions([]);
-      setProjectsError("Fehler beim Laden der Projekte");
+
       setInitialLoading(false);
     } finally {
       setProjectsLoading(false);
@@ -944,7 +1024,6 @@ export default function LCACalculatorComponent(): JSX.Element {
   };
 
   useEffect(() => {
-    logger.info("[useEffect] Initial projects fetch on mount");
     fetchProjects();
   }, []);
 
