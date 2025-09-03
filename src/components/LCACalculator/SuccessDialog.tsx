@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   Box,
   Button,
@@ -22,33 +21,31 @@ export default function SuccessDialog({ open, onClose }: SuccessDialogProps) {
       maxWidth="sm"
       fullWidth
     >
-      <DialogTitle>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Box
-            sx={{
-              width: 40,
-              height: 40,
-              borderRadius: "50%",
-              bgcolor: "success.light",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "success.dark",
-            }}
+      <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+        <Box
+          sx={{
+            width: 40,
+            height: 40,
+            borderRadius: "50%",
+            bgcolor: "success.light",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "success.dark",
+          }}
+        >
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
           >
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M20 6L9 17l-5-5" />
-            </svg>
-          </Box>
-          <Typography variant="h6">Erfolgreich gesendet</Typography>
+            <path d="M20 6L9 17l-5-5" />
+          </svg>
         </Box>
+        Erfolgreich gesendet
       </DialogTitle>
       <DialogContent>
         <Typography variant="body1" paragraph>

@@ -178,9 +178,14 @@ class KafkaService {
           }
           sentKeys.add(uniqueKey);
 
-          // Directly map fields
+          /**
+           * CRITICAL: Element Identification via global_id
+           * We MUST send the original IFC GUID (global_id) as the element identifier.
+           * This ensures the Cost plugin can properly match elements using the same GUID
+           * that was used throughout the QTO → LCA → Cost pipeline.
+           */
           kafkaLcaData.push({
-            id: instanceResult.id, // Use element ID
+            id: instanceResult.id, // CRITICAL: This is the element_global_id (original IFC GUID)
             sequence: instanceResult.sequence,
             mat_kbob: instanceResult.kbob_name, // Use KBOB Name field
             gwp_relative: instanceResult.gwp_relative, // Use pre-calculated value

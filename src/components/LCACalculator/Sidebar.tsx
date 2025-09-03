@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   Box,
   Button,
@@ -16,8 +15,9 @@ import {
   useTheme,
 } from "@mui/material";
 import Select from "react-select";
+import { StylesConfig, CSSObjectWithLabel } from "react-select";
 import { ProjectOption } from "../../types/calculator.types";
-import { OutputFormats, OutputFormatLabels } from "../../types/lca.types";
+import { OutputFormats, OutputFormatLabels, Material, KbobMaterial } from "../../types/lca.types";
 
 interface SidebarProps {
   selectedProject: ProjectOption | null;
@@ -25,15 +25,15 @@ interface SidebarProps {
   projectsLoading: boolean;
   ebfInput: string;
   outputFormat: OutputFormats;
-  modelledMaterials: any[];
+  modelledMaterials: Material[];
   matches: Record<string, string>;
-  kbobMaterials: any[];
+  kbobMaterials: KbobMaterial[];
   currentImpact: string;
   onProjectChange: (project: ProjectOption | null) => void;
   onEbfChange: (value: string) => void;
   onOutputFormatChange: (format: OutputFormats) => void;
   onBulkMatch: () => void;
-  selectStyles: any;
+  selectStyles: StylesConfig;
 }
 
 const Instructions = [
@@ -292,12 +292,12 @@ export default function Sidebar({
                   (opt) => opt.value === outputFormat
                 )}
                 onChange={(newValue) =>
-                  onOutputFormatChange(newValue?.value as OutputFormats)
+                  onOutputFormatChange((newValue as { value: string })?.value as OutputFormats)
                 }
                 options={outputFormatOptions}
                 styles={{
-                  ...selectStyles,
-                  control: (base: any) => ({
+                  ...(selectStyles as Record<string, unknown>),
+                  control: (base: CSSObjectWithLabel) => ({
                     ...base,
                     backgroundColor: "white",
                     borderColor: theme.palette.divider,

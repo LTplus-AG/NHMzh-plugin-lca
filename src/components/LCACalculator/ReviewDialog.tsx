@@ -47,7 +47,7 @@ interface ReviewDialogProps {
   materialDensities: Record<string, number>;
   outputFormat: OutputFormats;
   ifcElementsWithImpacts: LcaElement[];
-  onSave: (data: any) => Promise<void>;
+  onSave: (data: unknown) => Promise<void>;
   kbobMaterials: KbobMaterial[];
   aggregatedMaterialImpacts: Record<string, MaterialImpact>;
 }

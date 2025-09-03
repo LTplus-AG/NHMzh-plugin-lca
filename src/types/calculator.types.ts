@@ -21,7 +21,7 @@ export interface IFCResult {
   projectId: string;
   ifcData: {
     materials?: IFCMaterial[];
-    elements?: any[]; // Using any to avoid circular dependency with LcaElement
+    elements?: import('./lca.types').LcaElement[];
     totalImpact?: {
       gwp: number;
       ubp: number;

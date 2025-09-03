@@ -11,16 +11,24 @@ import {
   FormLabel,
 } from "@mui/material";
 import Select from "react-select";
-import { UnmodelledMaterial, KbobMaterial } from "../../types/lca.types";
+import { StylesConfig } from "react-select";
+import {
+  UnmodelledMaterial,
+  KbobMaterial
+} from "../../types/lca.types";
+import {
+  MaterialOption,
+  MaterialOptionGroup
+} from "../../types/calculator.types";
 
 interface EditMaterialDialogProps {
   open: boolean;
   material: UnmodelledMaterial | null;
   onClose: () => void;
   onSave: (material: UnmodelledMaterial) => void;
-  selectStyles: any;
+  selectStyles: StylesConfig;
   kbobMaterials: KbobMaterial[];
-  kbobMaterialOptions: any;
+  kbobMaterialOptions: MaterialOption[] | MaterialOptionGroup[];
 }
 
 const EditMaterialDialog: React.FC<EditMaterialDialogProps> = ({
@@ -78,7 +86,7 @@ const EditMaterialDialog: React.FC<EditMaterialDialogProps> = ({
     onSave(editedMaterial);
   };
 
-  const handleMaterialSelect = (option: any) => {
+  const handleMaterialSelect = (option: MaterialOption | null) => {
     setEditedMaterial({
       ...editedMaterial,
       kbobId: option?.value || "",
@@ -150,7 +158,7 @@ const EditMaterialDialog: React.FC<EditMaterialDialogProps> = ({
                     }
                   : null
               }
-              onChange={handleMaterialSelect}
+              onChange={(option) => handleMaterialSelect(option as MaterialOption | null)}
               placeholder="KBOB-Material auswählen..."
               isClearable
             />
