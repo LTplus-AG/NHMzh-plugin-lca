@@ -3,7 +3,8 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg?style=for-the-badge)](https://www.gnu.org/licenses/agpl-3.0)
 [![React](https://img.shields.io/badge/React-18.3-61DAFB.svg?style=for-the-badge&logo=react)](https://reactjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6.svg?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-5.4-646CFF.svg?style=for-the-badge&logo=vite)](https://vitejs.dev/)
+[![Vite](https://img.shields.io/badge/Vite-5.0-646CFF.svg?style=for-the-badge&logo=vite)](https://vitejs.dev/)
+[![Node.js](https://img.shields.io/badge/Node.js-18.x-339933.svg?style=for-the-badge&logo=node.js)](https://nodejs.org/)
 
 Modul zur Ökobilanzierung (LCA) im Nachhaltigkeitsmonitoring der Stadt Zürich (NHMzh).
 
@@ -21,10 +22,10 @@ Modul zur Ökobilanzierung (LCA) im Nachhaltigkeitsmonitoring der Stadt Zürich 
 
 ### 🏛️ Architektur und Kontext
 
-Dieses Plugin ist die Weboberfläche für das LCA-Modul und ist Teil des NHMzh-Ökosystems. Die Architektur basiert auf einem dedizierten Backend, das für die Berechnungen zuständig ist.
+Dieses Plugin ist die Weboberfläche für das LCA-Modul und ist Teil des NHMzh-Ökosystems. Die Architektur basiert auf einem dedizierten Backend für die Berechnungen.
 
-- **Frontend**: Eine in React und TypeScript entwickelte Single-Page-Application (SPA) zur Visualisierung von LCA-Daten und zur Interaktion mit dem Benutzer.
-- **Backend**: Ein in `backend/` enthaltener Node.js/Express-Server, der als API für das Frontend dient.
+- **Frontend**: Eine in React/TypeScript entwickelte Single-Page-Application, gebündelt über Vite. Sie visualisiert LCA-Daten, ermöglicht Material-Mappings und stösst Bestätigungen an.
+- **Backend**: Ein Express-Server in `backend/` (TypeScript), der die Berechnungslogik kapselt. Er greift auf die QTO-Datenbank zu, persistiert Ergebnisse in der `lca`-MongoDB, publiziert bestätigte Ergebnisse via Kafka und stellt REST-Endpunkte bereit.
 - **Datenfluss**:
     1. Das **LCA-Backend** fragt die `elements`-Sammlung aus der **MongoDB-Datenbank des QTO-Plugins** ab, um Material- und Mengendaten zu erhalten.
     2. Es berechnet die Umweltauswirkungen (GWP, UBP, PENR) basierend auf Materialvolumen und KBOB-Ökokennwerten.
@@ -88,23 +89,22 @@ Das Backend kann **zusammengefasste Endergebnisse** an **Kafka** publizieren. Di
 Server für die Entwicklungsumgebung starten:
 
 ```bash
-# Repository klonen
-git clone https://github.com/LTplus-AG/NHMzh-plugin-lca.git
-cd NHMzh-plugin-lca
-
-# Frontend-Abhängigkeiten installieren
+# Frontend (Vite + React/TypeScript)
+cd plugin-lca
 npm install
+npm run dev
 
-# Backend-Abhängigkeiten installieren
+# Backend (Express + TypeScript)
 cd backend
 npm install
-cd ..
-
-# Frontend-Entwicklungsserver starten
 npm run dev
 ```
 
-Die Anwendung ist unter [http://localhost:5173](http://localhost:5173) erreichbar. Das Backend muss separat gestartet werden.
+Das Frontend läuft standardmässig unter `http://localhost:5173`, das Backend unter dem Port aus `backend/config.ts` (Standard: `8002`).
+
+### 🤝 Förderung & Urheberschaft
+
+Dieses Projekt wurde durch die Stadt Zürich finanziert. Der gesamte in diesem Repository enthaltene Quellcode stammt von Louis Trümpler (LTplus AG).
 
 ### 🔧 Umgebungsvariablen
 

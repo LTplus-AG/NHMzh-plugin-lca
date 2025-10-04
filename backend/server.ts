@@ -91,6 +91,16 @@ app.get("/health", (req, res) => res.status(200).json({
   timestamp: new Date().toISOString() 
 }));
 
+// --- Debug Endpoint: View Last Kafka Messages ---
+app.get("/debug/kafka-messages", async (req, res) => {
+  res.status(200).json({
+    service: "lca-service",
+    kafka_topic: process.env.KAFKA_TOPIC_LCA || "lca-data",
+    total_stored: kafkaService.getLastKafkaMessages().length,
+    messages: kafkaService.getLastKafkaMessages()
+  });
+});
+
 app.get("/api/kbob/materials", haltOnTimedout, async (req, res) => {
   if (!lcaDbInstance) return res.status(503).json({ message: "Database not available" });
   try {

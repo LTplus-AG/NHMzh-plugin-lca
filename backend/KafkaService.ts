@@ -48,6 +48,10 @@ class KafkaService {
     groupId: process.env.KAFKA_GROUP_ID || "lca-plugin-group",
   };
 
+  // Debug: Store last sent Kafka messages
+  private lastKafkaMessages: Array<{ timestamp: Date; topic: string; project: string; fileId: string; count: number; sample: any }> = [];
+  private readonly MAX_STORED_MESSAGES = 50;
+
   constructor() {
     this.kafka = new Kafka({
       clientId: this.config.clientId,
@@ -250,14 +254,28 @@ class KafkaService {
         }
       } // End batch loop
 
-      if (allBatchesSentSuccessfully)
+      if (allBatchesSentSuccessfully) {
         logger.info(
           `[Kafka Send] All ${batches.length} batches sent successfully for fileId ${kafkaMetadata.fileId}.`
         );
-      else
+        
+        // Store for debugging
+        this.lastKafkaMessages.unshift({
+          timestamp: new Date(),
+          topic: this.config.lcaTopic,
+          project: kafkaMetadata.project,
+          fileId: kafkaMetadata.fileId,
+          count: materialInstanceResults.length,
+          sample: materialInstanceResults.slice(0, 5) // Store first 5 elements as sample
+        });
+        if (this.lastKafkaMessages.length > this.MAX_STORED_MESSAGES) {
+          this.lastKafkaMessages.pop();
+        }
+      } else {
         logger.error(
           `[Kafka Send] Failed to send one or more batches for fileId ${kafkaMetadata.fileId}.`
         );
+      }
 
       return allBatchesSentSuccessfully;
     } catch (error) {
@@ -365,6 +383,20 @@ class KafkaService {
    */
   isKafkaConnected(): boolean {
     return this.isConnected;
+  }
+
+  /**
+   * Debug: Get last sent Kafka messages
+   */
+  getLastKafkaMessages() {
+    return this.lastKafkaMessages.map(msg => ({
+      timestamp: msg.timestamp.toISOString(),
+      topic: msg.topic,
+      project: msg.project,
+      fileId: msg.fileId,
+      element_count: msg.count,
+      sample_elements: msg.sample
+    }));
   }
 }
 
