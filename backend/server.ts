@@ -10,10 +10,7 @@ import timeout from "connect-timeout";
 import { kafkaService, KafkaMetadata } from "./KafkaService";
 import { seedKbobData } from "./dbSeeder";
 import { config } from "./config";
-import { QtoElement as QtoElementType } from "./types";
 import logger from "./logger";
-import { Request, Response } from "express";
-import { Kafka, Producer } from "kafkajs";
 
 let lcaDbInstance: Db | null = null;
 let qtoDbInstance: Db | null = null;
@@ -90,16 +87,6 @@ app.get("/health", (req, res) => res.status(200).json({
   status: "healthy",
   timestamp: new Date().toISOString() 
 }));
-
-// --- Debug Endpoint: View Last Kafka Messages ---
-app.get("/debug/kafka-messages", async (req, res) => {
-  res.status(200).json({
-    service: "lca-service",
-    kafka_topic: process.env.KAFKA_TOPIC_LCA || "lca-data",
-    total_stored: kafkaService.getLastKafkaMessages().length,
-    messages: kafkaService.getLastKafkaMessages()
-  });
-});
 
 app.get("/api/kbob/materials", haltOnTimedout, async (req, res) => {
   if (!lcaDbInstance) return res.status(503).json({ message: "Database not available" });

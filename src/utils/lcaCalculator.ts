@@ -117,51 +117,6 @@ export class LCACalculator {
     return LCAFormatter.formatImpact(value, type, includeUnit);
   }
 
-  /**
-   * Calculates and formats a grand total value for display in the UI
-   * @deprecated Use calculateGrandTotalWithElements for accurate element-specific amortization
-   */
-  calculateGrandTotal(
-    materials: Material[],
-    matches: Record<string, string>,
-    kbobMaterials: KbobMaterial[],
-    outputFormat: OutputFormats,
-    materialDensities: Record<string, number> = {},
-    lifetime?: number,
-    displayMode: DisplayMode = "total",
-    ebf: number | null = null
-  ): string {
-    const { divisor, suffix, error } = LCADisplayHelper.getDivisorAndSuffix(
-      displayMode,
-      ebf,
-      lifetime || DEFAULT_AMORTIZATION_YEARS
-    );
-
-    // Handle error state for relative mode with invalid EBF
-    if (error) {
-      return error;
-    }
-
-    // Calculate total impact value
-    const totalValue = LCAImpactCalculator.calculateTotalImpact(
-      materials,
-      matches,
-      kbobMaterials,
-      materialDensities,
-      outputFormat
-    );
-
-    // Apply divisor based on display mode
-    const value = totalValue / divisor;
-
-    // <<< ADDED: Call the new formatter method >>>
-    return LCAFormatter.formatGrandTotal(
-      value,
-      outputFormat,
-      displayMode,
-      suffix
-    );
-  }
 
   /**
    * Calculates and formats a grand total value using element-specific amortization years

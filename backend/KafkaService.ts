@@ -11,21 +11,6 @@ import logger from "./logger";
 
 dotenv.config();
 
-// Define LcaElementData interface for backward compatibility with test code
-export interface LcaElementData {
-  id: string;
-  category: string;
-  level: string;
-  is_structural: boolean;
-  materials: {
-    name: string;
-    volume: number;
-    impact?: LcaImpact;
-  }[];
-  impact: LcaImpact;
-  sequence?: number;
-  primaryKbobId?: string;
-}
 
 // Re-export types from the types module for backward compatibility
 export type { LcaImpact, KafkaMetadata };
@@ -48,9 +33,6 @@ class KafkaService {
     groupId: process.env.KAFKA_GROUP_ID || "lca-plugin-group",
   };
 
-  // Debug: Store last sent Kafka messages
-  private lastKafkaMessages: Array<{ timestamp: Date; topic: string; project: string; fileId: string; count: number; sample: any }> = [];
-  private readonly MAX_STORED_MESSAGES = 50;
 
   constructor() {
     this.kafka = new Kafka({
@@ -259,18 +241,6 @@ class KafkaService {
           `[Kafka Send] All ${batches.length} batches sent successfully for fileId ${kafkaMetadata.fileId}.`
         );
         
-        // Store for debugging
-        this.lastKafkaMessages.unshift({
-          timestamp: new Date(),
-          topic: this.config.lcaTopic,
-          project: kafkaMetadata.project,
-          fileId: kafkaMetadata.fileId,
-          count: materialInstanceResults.length,
-          sample: materialInstanceResults.slice(0, 5) // Store first 5 elements as sample
-        });
-        if (this.lastKafkaMessages.length > this.MAX_STORED_MESSAGES) {
-          this.lastKafkaMessages.pop();
-        }
       } else {
         logger.error(
           `[Kafka Send] Failed to send one or more batches for fileId ${kafkaMetadata.fileId}.`
@@ -285,43 +255,6 @@ class KafkaService {
       );
       return false;
     }
-  }
-
-  /**
-   * @deprecated Use the new sendLcaBatchToKafka method that takes pre-calculated values
-   * This method is kept for compatibility with existing code
-   */
-  async sendLcaBatchToKafkaLegacy(
-    elements: LcaElementData[],
-    kafkaMetadata: KafkaMetadata,
-    totals: { totalGwp: number; totalUbp: number; totalPenr: number }
-  ): Promise<boolean> {
-    logger.warn(
-      "Using deprecated method sendLcaBatchToKafkaLegacy - please update your code"
-    );
-    // Convert the old format to the new format for backward compatibility
-    const materialInstanceResults: MaterialInstanceResult[] = elements.map(
-      (element, index) => {
-        const impact = element.impact || { gwp: 0, ubp: 0, penr: 0 };
-        return {
-          id: element.id,
-          sequence: element.sequence || index,
-          material_name: element.materials?.[0]?.name || "Unknown",
-          kbob_id: element.primaryKbobId || null,
-          kbob_name: "Unknown KBOB", // We don't have this in the old format
-          ebkp_code: null, // We don't have this in the old format
-          amortization_years: 45, // Use default 45 years
-          gwp_absolute: impact.gwp,
-          ubp_absolute: impact.ubp,
-          penr_absolute: impact.penr,
-          gwp_relative: impact.gwp / 45, // Simple approximation - not accurate!
-          ubp_relative: impact.ubp / 45,
-          penr_relative: impact.penr / 45,
-        };
-      }
-    );
-
-    return this.sendLcaBatchToKafka(materialInstanceResults, kafkaMetadata);
   }
 
   /**
@@ -385,19 +318,6 @@ class KafkaService {
     return this.isConnected;
   }
 
-  /**
-   * Debug: Get last sent Kafka messages
-   */
-  getLastKafkaMessages() {
-    return this.lastKafkaMessages.map(msg => ({
-      timestamp: msg.timestamp.toISOString(),
-      topic: msg.topic,
-      project: msg.project,
-      fileId: msg.fileId,
-      element_count: msg.count,
-      sample_elements: msg.sample
-    }));
-  }
 }
 
 // Export a singleton instance
