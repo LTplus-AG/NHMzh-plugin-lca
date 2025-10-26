@@ -11,21 +11,6 @@ import logger from "./logger";
 
 dotenv.config();
 
-// Define LcaElementData interface for backward compatibility with test code
-export interface LcaElementData {
-  id: string;
-  category: string;
-  level: string;
-  is_structural: boolean;
-  materials: {
-    name: string;
-    volume: number;
-    impact?: LcaImpact;
-  }[];
-  impact: LcaImpact;
-  sequence?: number;
-  primaryKbobId?: string;
-}
 
 // Re-export types from the types module for backward compatibility
 export type { LcaImpact, KafkaMetadata };
@@ -47,6 +32,7 @@ class KafkaService {
     lcaTopic: process.env.KAFKA_TOPIC_LCA || "lca-data",
     groupId: process.env.KAFKA_GROUP_ID || "lca-plugin-group",
   };
+
 
   constructor() {
     this.kafka = new Kafka({
@@ -250,14 +236,16 @@ class KafkaService {
         }
       } // End batch loop
 
-      if (allBatchesSentSuccessfully)
+      if (allBatchesSentSuccessfully) {
         logger.info(
           `[Kafka Send] All ${batches.length} batches sent successfully for fileId ${kafkaMetadata.fileId}.`
         );
-      else
+        
+      } else {
         logger.error(
           `[Kafka Send] Failed to send one or more batches for fileId ${kafkaMetadata.fileId}.`
         );
+      }
 
       return allBatchesSentSuccessfully;
     } catch (error) {
@@ -267,43 +255,6 @@ class KafkaService {
       );
       return false;
     }
-  }
-
-  /**
-   * @deprecated Use the new sendLcaBatchToKafka method that takes pre-calculated values
-   * This method is kept for compatibility with existing code
-   */
-  async sendLcaBatchToKafkaLegacy(
-    elements: LcaElementData[],
-    kafkaMetadata: KafkaMetadata,
-    totals: { totalGwp: number; totalUbp: number; totalPenr: number }
-  ): Promise<boolean> {
-    logger.warn(
-      "Using deprecated method sendLcaBatchToKafkaLegacy - please update your code"
-    );
-    // Convert the old format to the new format for backward compatibility
-    const materialInstanceResults: MaterialInstanceResult[] = elements.map(
-      (element, index) => {
-        const impact = element.impact || { gwp: 0, ubp: 0, penr: 0 };
-        return {
-          id: element.id,
-          sequence: element.sequence || index,
-          material_name: element.materials?.[0]?.name || "Unknown",
-          kbob_id: element.primaryKbobId || null,
-          kbob_name: "Unknown KBOB", // We don't have this in the old format
-          ebkp_code: null, // We don't have this in the old format
-          amortization_years: 45, // Use default 45 years
-          gwp_absolute: impact.gwp,
-          ubp_absolute: impact.ubp,
-          penr_absolute: impact.penr,
-          gwp_relative: impact.gwp / 45, // Simple approximation - not accurate!
-          ubp_relative: impact.ubp / 45,
-          penr_relative: impact.penr / 45,
-        };
-      }
-    );
-
-    return this.sendLcaBatchToKafka(materialInstanceResults, kafkaMetadata);
   }
 
   /**
@@ -366,6 +317,7 @@ class KafkaService {
   isKafkaConnected(): boolean {
     return this.isConnected;
   }
+
 }
 
 // Export a singleton instance

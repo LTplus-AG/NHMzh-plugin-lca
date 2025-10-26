@@ -10,10 +10,7 @@ import timeout from "connect-timeout";
 import { kafkaService, KafkaMetadata } from "./KafkaService";
 import { seedKbobData } from "./dbSeeder";
 import { config } from "./config";
-import { QtoElement as QtoElementType } from "./types";
 import logger from "./logger";
-import { Request, Response } from "express";
-import { Kafka, Producer } from "kafkajs";
 
 let lcaDbInstance: Db | null = null;
 let qtoDbInstance: Db | null = null;

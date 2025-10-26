@@ -44,19 +44,3 @@ export function hasAmortizationData(ebkpCode: string): boolean {
 export function getEbkpCodesWithAmortization(): string[] {
   return Array.from(AMORTIZATION_LOOKUP.keys());
 }
-
-/**
- * Creates a backward-compatible lookup object for migration purposes
- * @param defaultYears - Default amortization years for codes with multiple options
- * @returns Record mapping EBKP codes to single amortization values
- */
-export function createLegacyAmortizationMap(defaultYears: number = DEFAULT_AMORTIZATION_YEARS): Record<string, number> {
-  const legacyMap: Record<string, number> = {};
-  
-  for (const [ebkpCode, amortizationOptions] of AMORTIZATION_LOOKUP.entries()) {
-    // Use first option as default for backward compatibility
-    legacyMap[ebkpCode] = amortizationOptions[0] || defaultYears;
-  }
-  
-  return legacyMap;
-} 
