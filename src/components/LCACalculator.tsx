@@ -93,7 +93,7 @@ interface RawElement {
   ifc_class?: string;
   element_type?: string;
   type_name?: string;
-  quantity?: number;
+  quantity?: number | { value: number; type: string; unit: string };  // Can be simple number or QTO edited object
   ebkp?: string;
   materials?: RawMaterial[];
   properties?: Record<string, unknown>;
@@ -201,13 +201,46 @@ export default function LCACalculatorComponent(): JSX.Element {
     if (!Array.isArray(elements)) return [];
     return elements.map((element: unknown, index: number): LcaElement => {
       const rawElement = element as RawElement;
-      const materials = (rawElement.materials || []).map((mat: RawMaterial) => ({
+      
+      // Extract user-edited quantity (from QTO) if available
+      let userEditedQuantity: number | null = null;
+      if (rawElement.quantity) {
+        if (typeof rawElement.quantity === 'object' && rawElement.quantity.value > 0) {
+          // User edited quantity from QTO
+          userEditedQuantity = rawElement.quantity.value;
+        } else if (typeof rawElement.quantity === 'number' && rawElement.quantity > 0) {
+          // Legacy numeric quantity
+          userEditedQuantity = rawElement.quantity;
+        }
+      }
+      
+      // Get original material volumes
+      const originalMaterials = (rawElement.materials || []).map((mat: RawMaterial) => ({
         id: mat.id || mat.name || `mat-${index}-${Math.random()}`,
         name: mat.name || "Unknown Material",
         volume: parseFloat(String(mat.volume ?? 0)),
         unit: mat.unit || "m³",
         kbobMaterialId: mat.kbob_id,
       }));
+      
+      // Calculate original total volume
+      const originalTotalVolume = originalMaterials.reduce(
+        (sum: number, mat: { volume: number }) => sum + mat.volume,
+        0
+      );
+      
+      // Scale material volumes if user edited quantity in QTO
+      const materials = originalMaterials.map(mat => {
+        if (userEditedQuantity !== null && originalTotalVolume > 0) {
+          // Scale material volume proportionally to match user-edited quantity
+          const scaleFactor = userEditedQuantity / originalTotalVolume;
+          return {
+            ...mat,
+            volume: mat.volume * scaleFactor
+          };
+        }
+        return mat;
+      });
 
       const properties = rawElement.properties || {};
 
