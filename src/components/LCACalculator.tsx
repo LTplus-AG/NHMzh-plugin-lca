@@ -205,23 +205,26 @@ export default function LCACalculatorComponent(): JSX.Element {
       // Extract user-edited quantity (from QTO) if available
       let userEditedQuantity: number | null = null;
       if (rawElement.quantity) {
-        if (typeof rawElement.quantity === 'object' && rawElement.quantity.value > 0) {
+        if (typeof rawElement.quantity === 'object' && Number.isFinite(rawElement.quantity.value) && rawElement.quantity.value > 0) {
           // User edited quantity from QTO
           userEditedQuantity = rawElement.quantity.value;
-        } else if (typeof rawElement.quantity === 'number' && rawElement.quantity > 0) {
+        } else if (typeof rawElement.quantity === 'number' && Number.isFinite(rawElement.quantity) && rawElement.quantity > 0) {
           // Legacy numeric quantity
           userEditedQuantity = rawElement.quantity;
         }
       }
       
       // Get original material volumes
-      const originalMaterials = (rawElement.materials || []).map((mat: RawMaterial) => ({
-        id: mat.id || mat.name || `mat-${index}-${Math.random()}`,
-        name: mat.name || "Unknown Material",
-        volume: parseFloat(String(mat.volume ?? 0)),
-        unit: mat.unit || "m³",
-        kbobMaterialId: mat.kbob_id,
-      }));
+      const originalMaterials = (rawElement.materials || []).map((mat: RawMaterial, matIndex: number) => {
+        const parsedVolume = parseFloat(String(mat.volume ?? 0));
+        return {
+          id: mat.id || mat.name || `mat-${index}-${matIndex}`,
+          name: mat.name || "Unknown Material",
+          volume: Number.isFinite(parsedVolume) ? parsedVolume : 0,
+          unit: mat.unit || "m³",
+          kbobMaterialId: mat.kbob_id,
+        };
+      });
       
       // Calculate original total volume
       const originalTotalVolume = originalMaterials.reduce(
@@ -231,7 +234,7 @@ export default function LCACalculatorComponent(): JSX.Element {
       
       // Scale material volumes if user edited quantity in QTO
       const materials = originalMaterials.map(mat => {
-        if (userEditedQuantity !== null && originalTotalVolume > 0) {
+        if (userEditedQuantity !== null && Number.isFinite(originalTotalVolume) && originalTotalVolume > 0) {
           // Scale material volume proportionally to match user-edited quantity
           const scaleFactor = userEditedQuantity / originalTotalVolume;
           return {

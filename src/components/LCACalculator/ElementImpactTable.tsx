@@ -365,7 +365,8 @@ const ElementImpactTable: React.FC<ElementImpactTableProps> = ({
 
         const group = groups.get(key)!;
         group.elementCount += 1;
-        group.totalQuantity += element.quantity ?? 0;
+        const quantityToAdd = Number.isFinite(element.quantity) ? element.quantity : 0;
+        group.totalQuantity += quantityToAdd;
         group.totalImpact.gwp += element.impact?.gwp ?? 0;
         group.totalImpact.ubp += element.impact?.ubp ?? 0;
         group.totalImpact.penr += element.impact?.penr ?? 0;
