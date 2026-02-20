@@ -179,6 +179,8 @@ export interface LcaElement {
     length?: number;
     volume?: number;
   };
+  is_manual?: boolean;
+  hasMaterials?: boolean;
   amortization_years?: number;
   updated_at?: string;
   created_at?: string;

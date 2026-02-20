@@ -59,6 +59,7 @@ const calculator = new LCACalculator();
 interface RawMaterial {
   id?: string;
   name?: string;
+  fraction?: number;
   volume?: number | string;
   unit?: string;
   kbob_id?: string;
@@ -102,6 +103,7 @@ interface RawElement {
     id?: string;
     name?: string;
   };
+  is_manual?: boolean;
   amortization_years?: number;
   updated_at?: string;
   created_at?: string;
@@ -214,8 +216,9 @@ export default function LCACalculatorComponent(): JSX.Element {
         }
       }
       
-      // Get original material volumes
-      const originalMaterials = (rawElement.materials || []).map((mat: RawMaterial, matIndex: number) => {
+      // Pass 1: build material objects with raw parsed volumes
+      const rawMaterialsList = rawElement.materials || [];
+      const originalMaterials = rawMaterialsList.map((mat: RawMaterial, matIndex: number) => {
         const parsedVolume = parseFloat(String(mat.volume ?? 0));
         return {
           id: mat.id || mat.name || `mat-${index}-${matIndex}`,
@@ -225,39 +228,69 @@ export default function LCACalculatorComponent(): JSX.Element {
           kbobMaterialId: mat.kbob_id,
         };
       });
-      
+
       // Calculate original total volume
       const originalTotalVolume = originalMaterials.reduce(
         (sum: number, mat: { volume: number }) => sum + mat.volume,
         0
       );
-      
-      // Scale material volumes if user edited quantity in QTO
-      const materials = originalMaterials.map(mat => {
-        if (userEditedQuantity !== null && Number.isFinite(originalTotalVolume) && originalTotalVolume > 0) {
-          // Scale material volume proportionally to match user-edited quantity
+
+      // Determine whether the QTO quantity represents a volume (m³) — needed for fraction-based derivation
+      const quantityObj = typeof rawElement.quantity === 'object' ? rawElement.quantity : null;
+      const isVolumetricQty =
+        !quantityObj ||
+        quantityObj.type === 'volume' ||
+        quantityObj.unit === 'm³';
+
+      // Pass 2: scale existing volumes OR derive from fractions when volumes are absent
+      const materials = originalMaterials.map((mat, matIdx) => {
+        if (originalTotalVolume > 0 && userEditedQuantity !== null && Number.isFinite(originalTotalVolume)) {
+          // Normal case: material volumes present — scale proportionally to QTO quantity
           const scaleFactor = userEditedQuantity / originalTotalVolume;
-          return {
-            ...mat,
-            volume: mat.volume * scaleFactor
-          };
+          return { ...mat, volume: mat.volume * scaleFactor };
+        }
+        if (originalTotalVolume === 0 && userEditedQuantity !== null && isVolumetricQty) {
+          // No stored volumes (area-based IFC types or manual elements) but a volumetric QTO
+          // quantity is available — derive each material's volume from its fraction
+          const fraction = rawMaterialsList[matIdx]?.fraction;
+          if (typeof fraction === 'number' && Number.isFinite(fraction) && fraction > 0) {
+            return { ...mat, volume: userEditedQuantity * fraction };
+          }
         }
         return mat;
       });
 
+      // Compute total material volume after all derivations/scaling
+      const totalMaterialVolume = materials.reduce(
+        (sum: number, mat: { volume: number }) => sum + mat.volume,
+        0
+      );
+
       const properties = rawElement.properties || {};
 
-      if (
-        rawElement.classification &&
-        (rawElement.classification.system === "EBKP" ||
-          rawElement.classification.system === "EBKP-H")
-      ) {
+      // Robust eBKP extraction — same priority order as Cost plugin:
+      // 1. classification.id (manual elements + some IFC)
+      // 2. properties.ebkph (most IFC elements from QTO parsing)
+      // 3. direct ebkp field
+      // 4. top-level alternative field names
+      if (rawElement.classification?.id) {
         properties.ebkp_code = rawElement.classification.id;
         properties.ebkp_name = rawElement.classification.name;
+      } else if (rawElement.properties && (rawElement.properties as Record<string, unknown>).ebkph) {
+        const ebkph = (rawElement.properties as Record<string, unknown>).ebkph as string;
+        properties.ebkp_code = ebkph;
+        properties.ebkp_name = ebkph;
       } else if (rawElement.ebkp) {
-        // Fallback: use direct ebkp field if available
         properties.ebkp_code = rawElement.ebkp;
-        properties.ebkp_name = rawElement.ebkp; // Use same value for name as fallback
+        properties.ebkp_name = rawElement.ebkp;
+      } else {
+        const code =
+          (rawElement as Record<string, unknown>).ebkp_code as string | undefined ||
+          (rawElement as Record<string, unknown>).ebkph as string | undefined;
+        if (code) {
+          properties.ebkp_code = code;
+          properties.ebkp_name = code;
+        }
       }
 
       // Initialize impact as undefined, it will be calculated later
@@ -301,13 +334,13 @@ export default function LCACalculatorComponent(): JSX.Element {
         ifc_class: rawElement.element_type || rawElement.ifc_class || "Unknown",
         element_type: rawElement.element_type || rawElement.ifc_class || "Unknown Element",
         type_name: rawElement.type_name,
-        quantity: materials.reduce(
-          (sum: number, mat: { volume: number }) => sum + mat.volume,
-          0
-        ),
+        // Use total material volume; fall back to QTO quantity when no material volumes available
+        quantity: totalMaterialVolume > 0 ? totalMaterialVolume : (userEditedQuantity ?? 0),
         properties: properties,
         materials: materials,
         impact: undefined,
+        is_manual: rawElement.is_manual ?? false,
+        hasMaterials: rawMaterialsList.length > 0,
       };
     });
   };
